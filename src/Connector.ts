@@ -31,8 +31,6 @@ import { EventEmitter } from 'events';
 
 import { ConnectorClient as Client } from './ConnectorClient';
 
-import * as jsonPatch from 'fast-json-patch'; // this is only used for debugging patches
-
 //import { debugAndPrintError, debugPatch, debugPatchData } from '../../colyseus/lib/Debug';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
@@ -292,6 +290,7 @@ export abstract class Connector extends EventEmitter {
         } else if (message[0] === Protocol.REQUEST_LISTEN_AREA) {
             this._requestAreaListen(client, message[1], message[2]);
         } else if (message[0] === Protocol.REQUEST_REMOVE_LISTEN_AREA) {
+            console.log('calling')
             this._requestRemoveAreaListen(client, message[1], message[2]);
         } else if(message[0] === Protocol.REQUEST_WRITE_AREA) {
             this._requestAreaWrite(client, message[1], message[2]);
@@ -393,13 +392,13 @@ export abstract class Connector extends EventEmitter {
     private _requestRemoveAreaListen(client: Client, areaId: string, options?: any) {
         const frontChannel = this.masterChannel.frontChannels[areaId];
         if(!(frontChannel)) return false;
-        frontChannel.send([Protocol.REQUEST_REMOVE_LISTEN_AREA, frontChannel.frontUid, options], areaId, client.id);
+        frontChannel.send([Protocol.REQUEST_REMOVE_LISTEN_AREA, options], areaId, client.id);
     }
 
     private _requestAreaWrite(client: Client, newAreaId: string, options?: any) {
         const frontChannel = this.masterChannel.frontChannels[newAreaId];
         if(!(frontChannel)) return false;
-        frontChannel.send([Protocol.REQUEST_REMOVE_LISTEN_AREA, frontChannel.frontUid, options], newAreaId, client.id);
+        frontChannel.send([Protocol.REQUEST_REMOVE_LISTEN_AREA, options], newAreaId, client.id);
     }
 
     private _onJoin(client: Client, options?: any, auth?: any) {

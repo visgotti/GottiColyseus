@@ -13,7 +13,7 @@ const connector_2_uri = 'tcp://127.0.0.1:4001';
 const area_1_uri = 'tcp://127.0.0.1:5000';
 const area_2_uri = 'tcp://127.0.0.1:5001';
 
-describe('Area and Connector Integration tests', () => {
+describe.only('Area and Connector Integration tests', () => {
 
     let areaServer1 = null;
     let areaServer2 = null;
@@ -123,6 +123,7 @@ describe('Area and Connector Integration tests', () => {
 
     describe('handles client listen requests correctly', () => {
         let onAddClientListenHandlerAccept1Spy;
+
         let onAddClientListenHandlerReject1Spy;
         let onAddedAreaListenAccept1Spy;
 
@@ -157,12 +158,33 @@ describe('Area and Connector Integration tests', () => {
                 done();
             }, 20);
         });
-
         it('rejects listen', (done) => {
             sinon.assert.calledOnce(onAddClientListenHandlerReject1Spy);
             assert.ok(onAddClientListenHandlerReject1Spy.returned(false));
             assert.ok(!(client1.id in rejectRoom1.clientsById));
             done();
+        });
+
+        it('removes listen', (done) => {
+            let onRemovedAreaListenAccept1Spy = sinon.spy(connector1, 'onRemovedAreaListen');
+            let requestRemoveListenSpy = sinon.spy(acceptRoom1, 'requestRemoveListen');
+            let removeClientListenerSpy = sinon.spy(acceptRoom1, 'removeClientListener');
+            const _requestRemoveAreaListenSpy = sinon.spy(connector1, '_requestRemoveAreaListen');
+            const message = [Protocol.REQUEST_REMOVE_LISTEN_AREA, 'accept1', { foo: 'bar' }];
+            const encoded = msgpack.encode(message);
+            // throws because client didnt set a write channel
+            client1.emit('message', encoded);
+
+            sinon.assert.calledOnce(_requestRemoveAreaListenSpy);
+
+            setTimeout(() => {
+                sinon.assert.calledOnce(requestRemoveListenSpy);
+                sinon.assert.calledOnce(removeClientListenerSpy);
+                assert.ok(!(client1.channelClient.isLinkedToChannel('accept1')));
+                sinon.assert.calledOnce(onRemovedAreaListenAccept1Spy);
+                assert.ok(!(client1.id in acceptRoom1.clientsById));
+                done();
+            }, 20);
         });
     });
 });

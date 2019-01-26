@@ -1,20 +1,9 @@
-
 import { BackChannel, BackMaster } from 'gotti-channels/dist';
 import { Protocol } from './Protocol';
-
-import * as fossilDelta from 'fossil-delta';
-import * as msgpack from 'notepack.io';
 
 import { EventEmitter } from 'events';
 
 import { AreaClient as Client } from './AreaClient';
-import { Presence } from 'colyseus/lib/presence/Presence';
-import { RemoteClient } from 'colyseus/lib/presence/RemoteClient';
-
-import { Deferred, logError, spliceOne } from 'colyseus/lib/Utils';
-
-import * as jsonPatch from 'fast-json-patch'; // this is only used for debugging patches
-import { debugAndPrintError, debugPatch, debugPatchData } from 'colyseus/lib/Debug';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
 
@@ -49,8 +38,6 @@ export abstract class AreaRoom extends EventEmitter {
     public masterChannel: BackMaster;
 
     public metadata: any = null;
-
-    public presence: Presence;
 
     public clientsById: any = {};
 
@@ -136,6 +123,7 @@ export abstract class AreaRoom extends EventEmitter {
      * @param options
      */
     public removeClientListener(clientId, options?) {
+        delete this.clientsById[clientId];
         this.masterChannel.messageClient(clientId, [Protocol.REQUEST_REMOVE_LISTEN_AREA, this.areaId, options]);
     };
 

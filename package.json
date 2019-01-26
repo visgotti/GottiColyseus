@@ -10,7 +10,7 @@
   "author": "visgotti",
   "license": "ISC",
   "dependencies": {
-    "gotti-channels": "^0.2.42",
+    "gotti-channels": "^0.2.43",
     "http-shutdown": "^1.2.0",
     "nanoid": "^2.0.1",
     "notepack.io": "^2.2.0",

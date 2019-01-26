@@ -16,6 +16,7 @@ export class DummyConnector extends Connector {
         return true;
     };
     onAddedAreaListen(clientUid, areaId, options) {}
+    onRemovedAreaListen(clientUid, areaId, options) {}
     onMessage(){}
 }
 
