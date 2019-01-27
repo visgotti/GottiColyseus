@@ -3,6 +3,9 @@ import { Protocol } from './Protocol';
 
 import { EventEmitter } from 'events';
 
+
+import { PublicAreaOptions } from './AreaServer';
+
 import { AreaClient as Client } from './AreaClient';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
@@ -30,6 +33,8 @@ export abstract class AreaRoom extends EventEmitter {
     public roomId: string;
     public roomName: string;
 
+    public publicOptions: PublicAreaOptions;
+
     readonly areaId: string | number;
 
     public patchRate: number = DEFAULT_PATCH_RATE;
@@ -43,8 +48,9 @@ export abstract class AreaRoom extends EventEmitter {
 
     private _patchInterval: NodeJS.Timer;
 
-    constructor(areaId) {
+    constructor(areaId, publicOptions?: PublicAreaOptions) {
         super();
+        this.publicOptions = publicOptions;
         this.areaId = areaId;
         this.masterChannel = null;
         this.areaChannel = null;
@@ -161,6 +167,7 @@ export abstract class AreaRoom extends EventEmitter {
             id: clientId,
             options: options,
         };
+
         this.onListen && this.onListen(clientId, options);
     };
 
@@ -205,10 +212,10 @@ export abstract class AreaRoom extends EventEmitter {
             } else if (message[0] === Protocol.SYSTEM_MESSAGE) {
                 //  this.onMessage(message[1]);
             } else if (message[0] === Protocol.REQUEST_WRITE_AREA) {
-                // [protocol, requestedId, options]
+                // [protocol, areaId, options]
                 const write = this.requestWrite(clientId, message[1], message[2]);
                 if(write) {
-                    this.setClientWrite(clientId, write);
+                    this.setClientWrite(clientId, message[1], write)
                 }
             } else if (message[0] === Protocol.REQUEST_REMOVE_LISTEN_AREA) {
                 const removed = this.requestRemoveListen(clientId, message[1]);

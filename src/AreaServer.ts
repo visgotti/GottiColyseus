@@ -2,9 +2,15 @@ import { AreaRoom } from './AreaRoom';
 
 import { BackMaster, BackChannel } from 'gotti-channels/dist';
 
+export type PublicAreaOptions = {
+    id: string,
+    options: any,
+}
+
 export type AreaOption = {
     RoomConstructor: any,
     id: string,
+    publicOptions?: PublicAreaOptions
 }
 
 export type AreaServerOptions = {
@@ -30,8 +36,9 @@ export class AreaServer {
         this.masterChannel.addChannels(areaIds);
 
         options.areas.forEach(area => {
+            this.masterChannel.backChannels[area.id].connectionOptions = area.publicOptions;
             const room = new area.RoomConstructor(area.id);
-            room.initializeChannels(this.masterChannel, this.masterChannel.backChannels[area.id])
+            room.initializeChannels(this.masterChannel, this.masterChannel.backChannels[area.id]);
             this.areas[area.id] = room;
         });
     }

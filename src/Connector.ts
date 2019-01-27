@@ -65,6 +65,8 @@ export interface BroadcastOptions {
 
 export abstract class Connector extends EventEmitter {
     protected httpServer: any;
+    public areaOptions: {[areaId: string]: any};
+
     public roomId: string;
     public serverIndex: number;
     public masterURI: string;
@@ -138,7 +140,8 @@ export abstract class Connector extends EventEmitter {
         //TODO: right now you need to wait a bit after connecting and binding to uris will refactor channels eventually to fix this
         return new Promise((resolve, reject) => {
             setTimeout(() => {
-                this.masterChannel.connect().then(() => {
+                this.masterChannel.connect().then((connection) => {
+                    this.areaOptions = connection.backChannelOptions;
                     this.registerAreaMessages();
                     return resolve(true);
                 });
@@ -152,8 +155,7 @@ export abstract class Connector extends EventEmitter {
     // added abstract methods
     public onAddedAreaListen?(client: any, areaId: string, options?: any): void | Promise<any>;
     public onRemovedAreaListen?(client: any, areaId: string, options?: any): void | Promise<any>;
-    public onAddedAreaWrite?(client: any, areaId: string): void | Promise<any>;
-    public onRemovedAreaWrite?(client: any, areaId: string): void | Promise<any>;
+    public onChangedAreaWrite?(client: any, newAreaId: string, oldAreaId?: string): void | Promise<any>;
 
     // Optional abstract methods
     public onInit?(options: any): void;
@@ -259,6 +261,7 @@ export abstract class Connector extends EventEmitter {
             }
         });
     }
+
     private registerAreaMessages() {
         Object.keys(this.channels).forEach(channelId => {
             const channel = this.channels[channelId];
@@ -290,7 +293,6 @@ export abstract class Connector extends EventEmitter {
         } else if (message[0] === Protocol.REQUEST_LISTEN_AREA) {
             this._requestAreaListen(client, message[1], message[2]);
         } else if (message[0] === Protocol.REQUEST_REMOVE_LISTEN_AREA) {
-            console.log('calling')
             this._requestRemoveAreaListen(client, message[1], message[2]);
         } else if(message[0] === Protocol.REQUEST_WRITE_AREA) {
             this._requestAreaWrite(client, message[1], message[2]);
@@ -345,14 +347,23 @@ export abstract class Connector extends EventEmitter {
      * @returns {boolean}
      */
     private async changeAreaWrite(client, newAreaId, writeOptions) : Promise<boolean> {
-        const success = client.channelClient.setProcessorChannel(newAreaId, false, writeOptions);
-        if(success) {
-            this.onAddedAreaWrite(client, newAreaId);
-            send(client, [Protocol.REQUEST_WRITE_AREA, newAreaId]);
-            return true;
-        } else {
-            return false;
+
+        const oldAreaId = client.channelClient.processorChannel;
+
+        let isLinked = client.channelClient.isLinkedToChannel(newAreaId);
+        if(!(isLinked)) {
+            isLinked = await this.addAreaListen(client, newAreaId, writeOptions);
         }
+
+        if(isLinked) {
+            const success = client.channelClient.setProcessorChannel(newAreaId, false, writeOptions);
+            if(success) {
+                this.onChangedAreaWrite(client, newAreaId, oldAreaId);
+                send(client, [Protocol.REQUEST_WRITE_AREA, newAreaId]);
+                return true;
+            }
+        }
+        return false;
     }
 
     private removeAreaListen(client, areaId, options) {
@@ -395,10 +406,12 @@ export abstract class Connector extends EventEmitter {
         frontChannel.send([Protocol.REQUEST_REMOVE_LISTEN_AREA, options], areaId, client.id);
     }
 
-    private _requestAreaWrite(client: Client, newAreaId: string, options?: any) {
+    private async _requestAreaWrite(client: Client, newAreaId: string, options?: any) {
+        const processorChannelId = client.channelClient.processorChannel;
+        if(!(processorChannelId)) throw 'Client needs a processor channel before making area write requests.';
+        // const changed = await this.changeAreaWrite(client, newAreaId, options);
         const frontChannel = this.masterChannel.frontChannels[newAreaId];
-        if(!(frontChannel)) return false;
-        frontChannel.send([Protocol.REQUEST_REMOVE_LISTEN_AREA, options], newAreaId, client.id);
+        frontChannel.send([Protocol.REQUEST_WRITE_AREA, newAreaId, options], client.channelClient.processorChannel, client.id);
     }
 
     private _onJoin(client: Client, options?: any, auth?: any) {
@@ -411,7 +424,7 @@ export abstract class Connector extends EventEmitter {
         this.clientsById[client.id] = client;
 
         // confirm room id that matches the room name requested to join
-        //send(client, [ Protocol.JOIN_CONNECTOR, client.sessionId ]);
+        //send(client, [ Protocol.JOIN_CONNECTOR, client.sessionId, client.id, this.gameId, this.areaOptions ]);
 
         client.on('message', this._onWebClientMessage.bind(this, client));
         client.once('close', this._onLeave.bind(this, client));

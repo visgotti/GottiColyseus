@@ -35,7 +35,8 @@ export const enum Protocol {
     GAME_ENDING = 32,
 
         // area to area communication
-    AREA_TO_AREA_SYSTEM_MESSAGE,
+    AREA_PUBLIC_OPTIONS = 33,
+    AREA_TO_AREA_SYSTEM_MESSAGE = 34,
 
         // Generic messages (50~60)
     BAD_REQUEST = 50,
@@ -47,6 +48,11 @@ export const enum Protocol {
 
 export const enum GateProtocols {
     CLIENT_REQUEST_CONNECTOR,
+}
+
+export enum StateProtocol {
+    SET = 0,
+    PATCH = 1
 }
 
 export function decode(message: any) {

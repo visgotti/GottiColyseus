@@ -15,31 +15,61 @@
   <component name="CreatePatchCommitExecutor">
     <option name="PATCH_PATH" value="" />
   </component>
+  <component name="DockManager">
+    <window id="8">
+      <content type="file-editors">
+        <state>
+          <leaf>
+            <file leaf-file-name="Config.ts" pinned="false" current-in-tab="true">
+              <entry file="file://$PROJECT_DIR$/src/Config.ts">
+                <provider selected="true" editor-type-id="text-editor">
+                  <state relative-caret-position="0">
+                    <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+                    <folding />
+                  </state>
+                </provider>
+              </entry>
+            </file>
+          </leaf>
+        </state>
+      </content>
+    </window>
+  </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="default_target" />
   <component name="FavoritesManager">
     <favorites_list name="GottiServer" />
   </component>
   <component name="FileEditorManager">
     <leaf>
-      <file leaf-file-name="AreaServer.test.ts" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/test/AreaServer.test.ts">
+      <file leaf-file-name="AreaRoom.ts" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/AreaRoom.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="143">
-              <caret line="20" column="30" lean-forward="false" selection-start-line="20" selection-start-column="30" selection-end-line="20" selection-end-column="30" />
+            <state relative-caret-position="450">
+              <caret line="51" column="16" lean-forward="false" selection-start-line="51" selection-start-column="16" selection-end-line="51" selection-end-column="16" />
               <folding>
-                <element signature="e#0#47#0" expanded="true" />
+                <element signature="e#0#62#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Integration.test.ts" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/test/Integration.test.ts">
+      <file leaf-file-name="Protocol.ts" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/Protocol.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="547">
-              <caret line="180" column="64" lean-forward="true" selection-start-line="180" selection-start-column="64" selection-end-line="180" selection-end-column="64" />
+            <state relative-caret-position="480">
+              <caret line="32" column="21" lean-forward="false" selection-start-line="32" selection-start-column="21" selection-end-line="32" selection-end-column="21" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="AreaServer.ts" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/AreaServer.ts">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="645">
+              <caret line="43" column="5" lean-forward="false" selection-start-line="43" selection-start-column="5" selection-end-line="43" selection-end-column="5" />
               <folding>
-                <element signature="e#40#87#0" expanded="true" />
+                <element signature="e#0#38#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -48,8 +78,8 @@
       <file leaf-file-name="Connector.ts" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/Connector.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="367">
-              <caret line="365" column="5" lean-forward="true" selection-start-line="365" selection-start-column="5" selection-end-line="365" selection-end-column="5" />
+            <state relative-caret-position="263">
+              <caret line="384" column="21" lean-forward="false" selection-start-line="384" selection-start-column="21" selection-end-line="384" selection-end-column="21" />
               <folding>
                 <element signature="n#!!doc" expanded="true" />
                 <element signature="e#610#637#0" expanded="true" />
@@ -60,11 +90,21 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="ConnectorClient.ts" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/ConnectorClient.ts">
+      <file leaf-file-name="Gate.ts" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/Gate.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="120">
-              <caret line="8" column="5" lean-forward="false" selection-start-line="8" selection-start-column="5" selection-end-line="8" selection-end-column="5" />
+            <state relative-caret-position="30">
+              <caret line="2" column="1" lean-forward="true" selection-start-line="2" selection-start-column="1" selection-end-line="2" selection-end-column="1" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="config.js" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/example/config.js">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="315">
+              <caret line="30" column="50" lean-forward="true" selection-start-line="30" selection-start-column="50" selection-end-line="30" selection-end-column="50" />
               <folding>
                 <element signature="n#!!doc" expanded="true" />
               </folding>
@@ -72,22 +112,26 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="MasterChannel.js" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/node_modules/gotti-channels/dist/Front/FrontMaster/MasterChannel.js">
+      <file leaf-file-name="mock.ts" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/test/mock.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="427">
-              <caret line="155" column="11" lean-forward="false" selection-start-line="155" selection-start-column="11" selection-end-line="155" selection-end-column="11" />
-              <folding />
+            <state relative-caret-position="450">
+              <caret line="114" column="1" lean-forward="true" selection-start-line="114" selection-start-column="1" selection-end-line="114" selection-end-column="1" />
+              <folding>
+                <element signature="e#0#62#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Client.js" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/node_modules/gotti-channels/dist/Client.js">
+      <file leaf-file-name="Integration.test.ts" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/test/Integration.test.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="285">
-              <caret line="40" column="7" lean-forward="true" selection-start-line="40" selection-start-column="7" selection-end-line="40" selection-end-column="7" />
-              <folding />
+            <state relative-caret-position="280">
+              <caret line="167" column="64" lean-forward="false" selection-start-line="167" selection-start-column="64" selection-end-line="167" selection-end-column="64" />
+              <folding>
+                <element signature="e#40#87#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -95,43 +139,9 @@
       <file leaf-file-name="package.json" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/package.json">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="210">
-              <caret line="14" column="23" lean-forward="true" selection-start-line="14" selection-start-column="23" selection-end-line="14" selection-end-column="23" />
+            <state relative-caret-position="195">
+              <caret line="13" column="23" lean-forward="true" selection-start-line="13" selection-start-column="23" selection-end-line="13" selection-end-column="23" />
               <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="AreaClient.ts" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/AreaClient.ts">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="60">
-              <caret line="4" column="2" lean-forward="false" selection-start-line="4" selection-start-column="2" selection-end-line="4" selection-end-column="2" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="AreaServer.ts" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/AreaServer.ts">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="600">
-              <caret line="40" column="5" lean-forward="false" selection-start-line="40" selection-start-column="5" selection-end-line="40" selection-end-column="5" />
-              <folding>
-                <element signature="e#0#38#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="AreaRoom.ts" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/src/AreaRoom.ts">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="232">
-              <caret line="40" column="0" lean-forward="true" selection-start-line="40" selection-start-column="0" selection-end-line="40" selection-end-column="0" />
-              <folding>
-                <element signature="e#0#62#0" expanded="true" />
-              </folding>
             </state>
           </provider>
         </entry>
@@ -140,36 +150,36 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>this._onJoin</find>
-      <find>onJoin</find>
-      <find>_onJoin</find>
-      <find>GottiClient</find>
-      <find>clientsById</find>
-      <find>_onWebClientMessage</find>
-      <find>onMessage</find>
-      <find>_onAddedAreaClientListen</find>
-      <find>_onMessage</find>
-      <find>onMessageHandler</find>
-      <find>onClientMessageHandler</find>
-      <find>console.log</find>
-      <find>request</find>
-      <find>requestWrite</find>
-      <find>setClientWrite</find>
-      <find>addClientToArea</find>
-      <find>_requestAreaListen</find>
-      <find>register</find>
-      <find>onListen</find>
-      <find>onAddedAreaListen</find>
       <find>onClientMessage</find>
-      <find>requestListen</find>
       <find>Accept</find>
-      <find>addAreaListen</find>
       <find>onWebClient</find>
-      <find>_requestRemoveAreaListen</find>
       <find>channelClient.onMess</find>
-      <find>removeAreaListen</find>
       <find>8080</find>
+      <find>removeAreaListen</find>
+      <find>linkChannel</find>
+      <find>Write</find>
+      <find>Presence</find>
+      <find>_requestRemoveAreaListen</find>
+      <find>_onAddedAreaClientListen</find>
+      <find>console.log</find>
+      <find>console</find>
+      <find>clientsById</find>
+      <find>REQUEST_WRITE_AREA</find>
       <find>removeClientListener</find>
+      <find>_requestAreaWrite</find>
+      <find>setRemoteClientToWrite</find>
+      <find>onMessage</find>
+      <find>linkChannel(</find>
+      <find>setListenerToWrite</find>
+      <find>setClientWrite</find>
+      <find>addAreaListen</find>
+      <find>REQUEST_WRITE</find>
+      <find>requestWrite</find>
+      <find>requestListen</find>
+      <find>changeAreaWrite</find>
+      <find>onConnection</find>
+      <find>JOIN_CONNECTOR</find>
+      <find>_onJoin</find>
     </findStrings>
     <replaceStrings>
       <replace>serverIndex</replace>
@@ -184,6 +194,7 @@
       <replace>_onWebClientMessage</replace>
       <replace>areaChannel</replace>
       <replace>clientsById</replace>
+      <replace>areaOptions</replace>
     </replaceStrings>
   </component>
   <component name="IdeDocumentHistory">
@@ -199,21 +210,24 @@
         <option value="$PROJECT_DIR$/src/ConnectorClient.ts" />
         <option value="$PROJECT_DIR$/src/Util.ts" />
         <option value="$PROJECT_DIR$/src/AreaClient.ts" />
-        <option value="$PROJECT_DIR$/src/Protocol.ts" />
         <option value="$PROJECT_DIR$/src/Area.ts" />
         <option value="$PROJECT_DIR$/test/AreaServer.test.ts" />
         <option value="$PROJECT_DIR$/test/AreaConnectorIntegration.test.ts" />
         <option value="$PROJECT_DIR$/node_modules/gotti-channels/dist/Back/BackChannel/BackChannel.js" />
-        <option value="$PROJECT_DIR$/src/AreaServer.ts" />
-        <option value="$PROJECT_DIR$/test/Connector.test.ts" />
         <option value="$PROJECT_DIR$/README.md" />
-        <option value="$PROJECT_DIR$/package.json" />
-        <option value="$PROJECT_DIR$/test/mock.ts" />
-        <option value="$PROJECT_DIR$/test/Integration.test.ts" />
         <option value="$PROJECT_DIR$/node_modules/gotti-channels/dist/Back/BackMaster/MasterChannel.js" />
         <option value="$PROJECT_DIR$/node_modules/gotti-channels/dist/Front/FrontMaster/MasterChannel.js" />
-        <option value="$PROJECT_DIR$/src/Connector.ts" />
+        <option value="$PROJECT_DIR$/test/Connector.test.ts" />
+        <option value="$PROJECT_DIR$/test/mock.ts" />
+        <option value="$PROJECT_DIR$/test/Integration.test.ts" />
         <option value="$PROJECT_DIR$/src/AreaRoom.ts" />
+        <option value="$PROJECT_DIR$/src/Protocol.ts" />
+        <option value="$PROJECT_DIR$/src/AreaServer.ts" />
+        <option value="$PROJECT_DIR$/src/Connector.ts" />
+        <option value="$PROJECT_DIR$/package.json" />
+        <option value="$PROJECT_DIR$/src/Config.ts" />
+        <option value="$PROJECT_DIR$/example/config.js" />
+        <option value="$PROJECT_DIR$/src/Gate.ts" />
       </list>
     </option>
   </component>
@@ -233,10 +247,10 @@
     <handled-path value="$PROJECT_DIR$/node_modules" />
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="1667" />
-    <option name="y" value="24" />
-    <option name="width" value="1533" />
-    <option name="height" value="876" />
+    <option name="x" value="59" />
+    <option name="y" value="21" />
+    <option name="width" value="1541" />
+    <option name="height" value="879" />
   </component>
   <component name="ProjectView">
     <navigator currentView="ProjectPane" proportions="" version="1">
@@ -291,6 +305,20 @@
             </PATH_ELEMENT>
             <PATH_ELEMENT>
               <option name="myItemId" value="src" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="GottiServer" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="GottiServer" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="example" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -383,19 +411,19 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1548363712883</updated>
-      <workItem from="1548363714222" duration="44741000" />
+      <workItem from="1548363714222" duration="61702000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="44741000" />
+    <option name="totallyTimeSpent" value="61702000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="1667" y="24" width="1533" height="876" extended-state="6" />
+    <frame x="59" y="21" width="1541" height="879" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="TypeScript" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="-1" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.23091976" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.22972097" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="false" weight="0.33" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
@@ -451,14 +479,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/Master.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/node_modules/gotti-channels/package.json">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
@@ -487,14 +507,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/Protocol.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="323">
-          <caret line="23" column="0" lean-forward="false" selection-start-line="23" selection-start-column="0" selection-end-line="23" selection-end-column="0" />
           <folding />
         </state>
       </provider>
@@ -531,36 +543,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/test/mock.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="337">
-          <caret line="107" column="23" lean-forward="false" selection-start-line="107" selection-start-column="4" selection-end-line="107" selection-end-column="23" />
-          <folding>
-            <element signature="e#0#62#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/test/Connector.test.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="428">
-          <caret line="160" column="65" lean-forward="false" selection-start-line="155" selection-start-column="8" selection-end-line="160" selection-end-column="65" />
-          <folding>
-            <element signature="e#40#83#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/test/AreaServer.test.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="143">
-          <caret line="20" column="30" lean-forward="false" selection-start-line="20" selection-start-column="30" selection-end-line="20" selection-end-column="30" />
-          <folding>
-            <element signature="e#0#47#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/node_modules/gotti-channels/dist/Front/FrontMaster/MasterChannel.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="427">
@@ -573,14 +555,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="285">
           <caret line="40" column="7" lean-forward="true" selection-start-line="40" selection-start-column="7" selection-end-line="40" selection-end-column="7" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/package.json">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="210">
-          <caret line="14" column="23" lean-forward="true" selection-start-line="14" selection-start-column="23" selection-end-line="14" selection-end-column="23" />
           <folding />
         </state>
       </provider>
@@ -601,35 +575,22 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/test/Connector.test.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="416">
+          <caret line="159" column="45" lean-forward="false" selection-start-line="159" selection-start-column="45" selection-end-line="159" selection-end-column="45" />
+          <folding>
+            <element signature="e#40#83#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/ConnectorClient.ts">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="120">
           <caret line="8" column="5" lean-forward="false" selection-start-line="8" selection-start-column="5" selection-end-line="8" selection-end-column="5" />
           <folding>
             <element signature="n#!!doc" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/Connector.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="367">
-          <caret line="365" column="5" lean-forward="true" selection-start-line="365" selection-start-column="5" selection-end-line="365" selection-end-column="5" />
-          <folding>
-            <element signature="n#!!doc" expanded="true" />
-            <element signature="e#610#637#0" expanded="true" />
-            <element signature="e#754#786#0" expanded="true" />
-            <element signature="e#1114#1152#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/test/Integration.test.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="547">
-          <caret line="180" column="64" lean-forward="true" selection-start-line="180" selection-start-column="64" selection-end-line="180" selection-end-column="64" />
-          <folding>
-            <element signature="e#40#87#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -642,23 +603,108 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/test/AreaServer.test.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="146">
+          <caret line="20" column="30" lean-forward="false" selection-start-line="20" selection-start-column="30" selection-end-line="20" selection-end-column="30" />
+          <folding>
+            <element signature="e#0#47#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Protocol.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="480">
+          <caret line="32" column="21" lean-forward="false" selection-start-line="32" selection-start-column="21" selection-end-line="32" selection-end-column="21" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/AreaServer.ts">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="600">
-          <caret line="40" column="5" lean-forward="false" selection-start-line="40" selection-start-column="5" selection-end-line="40" selection-end-column="5" />
+        <state relative-caret-position="645">
+          <caret line="43" column="5" lean-forward="false" selection-start-line="43" selection-start-column="5" selection-end-line="43" selection-end-column="5" />
           <folding>
             <element signature="e#0#38#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/AreaRoom.ts">
+    <entry file="file://$PROJECT_DIR$/src/Connector.ts">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="232">
-          <caret line="40" column="0" lean-forward="true" selection-start-line="40" selection-start-column="0" selection-end-line="40" selection-end-column="0" />
+        <state relative-caret-position="263">
+          <caret line="384" column="21" lean-forward="false" selection-start-line="384" selection-start-column="21" selection-end-line="384" selection-end-column="21" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+            <element signature="e#610#637#0" expanded="true" />
+            <element signature="e#754#786#0" expanded="true" />
+            <element signature="e#1114#1152#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/package.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="195">
+          <caret line="13" column="23" lean-forward="true" selection-start-line="13" selection-start-column="23" selection-end-line="13" selection-end-column="23" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/mock.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="450">
+          <caret line="114" column="1" lean-forward="true" selection-start-line="114" selection-start-column="1" selection-end-line="114" selection-end-column="1" />
           <folding>
             <element signature="e#0#62#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/Integration.test.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="280">
+          <caret line="167" column="64" lean-forward="false" selection-start-line="167" selection-start-column="64" selection-end-line="167" selection-end-column="64" />
+          <folding>
+            <element signature="e#40#87#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/AreaRoom.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="450">
+          <caret line="51" column="16" lean-forward="false" selection-start-line="51" selection-start-column="16" selection-end-line="51" selection-end-column="16" />
+          <folding>
+            <element signature="e#0#62#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Config.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/example/config.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="315">
+          <caret line="30" column="50" lean-forward="true" selection-start-line="30" selection-start-column="50" selection-end-line="30" selection-end-column="50" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Gate.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="30">
+          <caret line="2" column="1" lean-forward="true" selection-start-line="2" selection-start-column="1" selection-end-line="2" selection-end-column="1" />
+          <folding />
         </state>
       </provider>
     </entry>

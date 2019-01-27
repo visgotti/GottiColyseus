@@ -128,10 +128,8 @@ describe.only('Area and Connector Integration tests', () => {
         let onAddedAreaListenAccept1Spy;
 
         before('client1 joins connector1 then makes listen requests to accept1 and reject1', (done) => {
-
             onAddClientListenHandlerAccept1Spy = sinon.spy(acceptRoom1.areaChannel, 'onAddClientListenHandler');
             onAddClientListenHandlerReject1Spy = sinon.spy(rejectRoom1.areaChannel, 'onAddClientListenHandler');
-
             onAddedAreaListenAccept1Spy = sinon.spy(connector1, 'onAddedAreaListen');
 
             connector1.emit('connection', client1, { auth: true, options: true });
@@ -143,10 +141,11 @@ describe.only('Area and Connector Integration tests', () => {
             const message2 = [Protocol.REQUEST_LISTEN_AREA, 'reject1', { foo: 'bar' }];
             const encoded2 = msgpack.encode(message2);
             client1.emit('message', encoded2);
+
             done();
         });
 
-        it('accepts listen', (done) => {
+        it('accepts listen when requested', (done) => {
             sinon.assert.calledOnce(onAddClientListenHandlerAccept1Spy);
             assert.ok(onAddClientListenHandlerAccept1Spy.returned({ foo: 'bar' }));
             assert.ok(client1.id in acceptRoom1.clientsById);
@@ -155,17 +154,22 @@ describe.only('Area and Connector Integration tests', () => {
             setTimeout(() => {
                 assert.ok(client1.channelClient.isLinkedToChannel('accept1'));
                 sinon.assert.calledOnce(onAddedAreaListenAccept1Spy);
+                onAddClientListenHandlerAccept1Spy.restore();
+                onAddClientListenHandlerReject1Spy.restore();
+                onAddedAreaListenAccept1Spy.restore();
+
                 done();
             }, 20);
         });
-        it('rejects listen', (done) => {
+
+        it('rejects listen when requested', (done) => {
             sinon.assert.calledOnce(onAddClientListenHandlerReject1Spy);
             assert.ok(onAddClientListenHandlerReject1Spy.returned(false));
             assert.ok(!(client1.id in rejectRoom1.clientsById));
             done();
         });
 
-        it('removes listen', (done) => {
+        it('removes listen when requested', (done) => {
             let onRemovedAreaListenAccept1Spy = sinon.spy(connector1, 'onRemovedAreaListen');
             let requestRemoveListenSpy = sinon.spy(acceptRoom1, 'requestRemoveListen');
             let removeClientListenerSpy = sinon.spy(acceptRoom1, 'removeClientListener');
@@ -183,7 +187,56 @@ describe.only('Area and Connector Integration tests', () => {
                 assert.ok(!(client1.channelClient.isLinkedToChannel('accept1')));
                 sinon.assert.calledOnce(onRemovedAreaListenAccept1Spy);
                 assert.ok(!(client1.id in acceptRoom1.clientsById));
+
+
+                onAddClientListenHandlerAccept1Spy.restore();
+                onAddClientListenHandlerReject1Spy.restore();
+                onAddedAreaListenAccept1Spy.restore();
+                onRemovedAreaListenAccept1Spy.restore();
+                requestRemoveListenSpy.restore();
+                removeClientListenerSpy.restore();
+                _requestRemoveAreaListenSpy.restore();
                 done();
+            }, 20);
+        });
+
+
+        it('Client links then the area tells it to start writing to itself', (done) => {
+            let changeAreaWriteSpy = sinon.spy(connector1, 'changeAreaWrite');
+            let onChangedAreaWriteSpy = sinon.spy(connector1, 'onChangedAreaWrite');
+            let requestWriteSpy = sinon.spy(acceptRoom1, 'requestWrite');
+            let setClientWriteSpy = sinon.spy(acceptRoom1, 'setClientWrite');
+
+            const message = [Protocol.REQUEST_LISTEN_AREA, 'accept1', { foo: 'bar' }];
+            const encoded = msgpack.encode(message);
+            client1.emit('message', encoded);
+
+            sinon.assert.calledOnce(onAddClientListenHandlerAccept1Spy);
+            // sinon.assert.calledOnce(changeAreaWriteSpy);
+
+            setTimeout(() => {
+                // confirm client listened to acceptRoom
+                assert.ok(client1.id in acceptRoom1.clientsById);
+                assert.deepStrictEqual(acceptRoom1.clientsById[client1.id].options, { foo: 'bar'});
+
+                // sends the notification to connector to add as write
+                acceptRoom1.setClientWrite(client1.id, acceptRoom1.areaId, { "foo": "baz" });
+
+                setTimeout(() => {
+                    // options should have changed
+                    assert.deepStrictEqual(acceptRoom1.clientsById[client1.id].options, { foo: 'baz'});
+
+                    sinon.assert.calledOnce(setClientWriteSpy);
+
+                    // onChangedWrite should have been called on connector
+                    sinon.assert.calledOnce(onChangedAreaWriteSpy);
+                    assert.ok(client1.channelClient.isLinkedToChannel('accept1'));
+                    assert.ok(client1.channelClient.processorChannel === 'accept1');
+
+                    //TODO: make sure messages are going through and state too
+
+                    done();
+                }, 20);
             }, 20);
         });
     });

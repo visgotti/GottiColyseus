@@ -17,6 +17,7 @@ export class DummyConnector extends Connector {
     };
     onAddedAreaListen(clientUid, areaId, options) {}
     onRemovedAreaListen(clientUid, areaId, options) {}
+    onChangedAreaWrite(clientUid, areaId, options) {}
     onMessage(){}
 }
 
@@ -97,7 +98,8 @@ export class AcceptsRequestsArea extends AreaRoom {
     constructor(id) {
         super(id);
     }
-    requestWrite(clientId, options?) {
+    requestWrite(clientId, areaId, options?) {
+        console.log('options were', options);
         const responseOptions = (!options) ? true : options;
         return responseOptions;
     }
