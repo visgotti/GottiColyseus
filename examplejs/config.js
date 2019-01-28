@@ -1,12 +1,62 @@
 /*
-*   Example configuration file for Gotti servers.
+*   Example configuration file for Gotti project.
 * */
 
-class WorldMapRoom {};
+const { Gate, AreaServer } = require('../dist');
 
-class CaveRoom {};
+const ExampleAreaRoom = require('./server/ExampleAreaRoom');
+const ExampleConnector = require('./server/ExampleConnector');
 
-class BuildingRoom {};
+const connector_1_uri = 'tcp://127.0.0.1:4000';
+const connector_2_uri = 'tcp://127.0.0.1:4001';
+
+const area_server_uri = 'tcp://127.0.0.1:5000';
+
+module.exports.connector1Options = {
+    server: 'http',
+    port: 8081,
+    roomId: 'test',
+    serverIndex: 2,
+    connectorURI: connector_1_uri,
+    areaRoomIds: ['example_area_room_1', 'example_area_room_2'],
+    areaServerURIs: [area_server_uri]
+};
+
+module.exports.connector2Options = {
+    server: 'http',
+    port: 8082,
+    roomId: 'test2',
+    serverIndex: 3,
+    connectorURI: connector_2_uri,
+    areaRoomIds:  ['example_area_room_1', 'example_area_room_2'],
+    areaServerURIs: [area_server_uri]
+}
+
+module.exports.areaServerOptions = {
+    serverIndex: 0,
+    areas: [{
+        RoomConstructor: ExampleAreaRoom,
+        id: 'example_area_room_1',
+        publicOptions: {
+            'foo': 'bar',
+        }
+    }, {
+        RoomConstructor: ExampleAreaRoom,
+        id: 'example_area_room_2',
+        publicOptions: {
+            'foo': 'baz'
+        }
+    }],
+    connectorURIs: [connector_1_uri, connector_2_uri],
+    areaURI: area_server_uri,
+};
+
+
+class WorldMapRoom {}
+
+class CaveRoom {}
+
+class BuildingRoom {}
 
 const config = {
     games: [{
@@ -48,7 +98,6 @@ const config = {
                     },
                 },
             ]
-
         }, {
             serverId: 'insideLevels',
             areaRooms: [

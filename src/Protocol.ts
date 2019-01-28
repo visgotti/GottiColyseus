@@ -72,3 +72,6 @@ export function send(client: ConnectorClient, message: any, encode: boolean = tr
         client.send((encode && msgpack.encode(message)) || message, { binary: true });
     }
 }
+
+export const GateProtocols = {
+}

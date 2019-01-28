@@ -89,6 +89,16 @@ export function merge(a: any, ...objs: any[]): any {
     return a;
 }
 
+export function sortByProperty (property) {
+    return function (a, b) {
+        if (a[property] < b[property])
+            return -1;
+        if (a[property] > b[property])
+            return 1;
+        return 0;
+    }
+}
+
 export function logError(err: Error): void {
     if (err) {
         console.error(`websocket error: ${err.message}\n${err.stack}`);

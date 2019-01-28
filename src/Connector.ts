@@ -44,16 +44,15 @@ export type ConnectorOptions = IServerOptions & {
     pingTimeout?: number,
     verifyClient?: WebSocket.VerifyClientCallbackAsync
     gracefullyShutdown?: boolean,
-    server: net.Server | http.Server,
-    roomId: string,
+    server: 'string',
+    port?: number,
     serverIndex: number,
-    masterURI: string,
-    channelIds: Array<string>,
-    areaURIs: Array<string>
+    connectorURI: string,
+    areaRoomIds: Array<string>,
+    areaServerURIs: Array<string>
 };
 
 export interface RoomAvailable {
-    roomId: string;
     clients: number;
     maxClients: number;
     metadata?: any;
@@ -67,11 +66,12 @@ export abstract class Connector extends EventEmitter {
     protected httpServer: any;
     public areaOptions: {[areaId: string]: any};
 
-    public roomId: string;
+    public options: ConnectorOptions;
+
     public serverIndex: number;
-    public masterURI: string;
-    public channelIds: Array<string>;
-    public areaURIs: Array<string>;
+    public connectorURI: string;
+    public areaRoomIds: Array<string>;
+    public areaServerURIs: Array<string>;
     public port: number;
 
     public roomName: string;
@@ -93,16 +93,22 @@ export abstract class Connector extends EventEmitter {
 
     constructor(options: ConnectorOptions) {
         super();
-        this.roomId = options.roomId;
-        this.channelIds = options.channelIds;
-        this.masterURI = options.masterURI;
-        this.areaURIs = options.areaURIs;
+        this.areaRoomIds = options.areaRoomIds;
+        this.connectorURI = options.connectorURI;
+        this.areaServerURIs = options.areaServerURIs;
         this.serverIndex = options.serverIndex;
+        this.port = options.port | 8080;
+        this.options = options;
+        this.options.port = this.port;
 
-        this.server = new WebSocket.Server(options);
-        this.httpServer = options.server;
-        this.httpServer.on('connection', this.onConnection);
-        this.on('connection', this.onConnection); // used for testing
+        if(options.server === 'http') {
+            this.httpServer = http.createServer();
+            this.options.server = this.httpServer;
+        } else if(options.server === 'net') {
+        } else {
+            throw 'please use http or net as server option'
+        }
+
         //this.setPatchRate(this.patchRate);
     }
 
@@ -132,17 +138,24 @@ export abstract class Connector extends EventEmitter {
 
     public async connectToAreas() : Promise<boolean> {
         this.masterChannel = new FrontMaster(this.serverIndex);
-
-        this.masterChannel.initialize(this.masterURI, this.areaURIs);
-        this.masterChannel.addChannels(this.channelIds);
+        this.masterChannel.initialize(this.connectorURI, this.areaServerURIs);
+        this.masterChannel.addChannels(this.areaRoomIds);
         this.channels = this.masterChannel.frontChannels;
 
         //TODO: right now you need to wait a bit after connecting and binding to uris will refactor channels eventually to fix this
         return new Promise((resolve, reject) => {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
+
                     this.areaOptions = connection.backChannelOptions;
                     this.registerAreaMessages();
+
+                    this.server = new WebSocket.Server(this.options);
+                    this.httpServer.on('connection', this.onConnection);
+                    this.on('connection', this.onConnection); // used for testing
+
+                    console.log(`Connector ${this.serverIndex} succesfully listening for client connections on port ${this.port}`)
+
                     return resolve(true);
                 });
             }, 500);
@@ -304,8 +317,6 @@ export abstract class Connector extends EventEmitter {
 
             // only effectively close connection when "onLeave" is fulfilled
             this._onLeave(client, WS_CLOSE_CONSENTED).then(() => client.close());
-        } else {
-            this.onMessage(client, message);
         }
     }
 
@@ -332,15 +343,7 @@ export abstract class Connector extends EventEmitter {
     }
 
     /**
-     * Function that will send a notifcation to the area telling it that a new client has just become
-     * a new writer, and it will trigger the onJoin hook with the sessionId of client and any options
-     * you pass in as the write options. You must be a listener to the area before writing to it, this
-     * is because all writers listen and listening where the real handshaking between the connector and
-     * area is done. This will automatically listen before writing- therefore you have the optional listenOptions
-     * in case you've configured your area to do specific things on the area room's onListen hook. Which will always be called
-     * first before the onJoin. oldWriteOptions will be sent to the previous writing area and trigger the onLeave hook of that area.
-     * You are still listening to the area after you leave as a writer, you must call removeClientListen if you want
-     * the client to completely stop listening for messages and state updates.
+     *
      * @param client
      * @param newAreaId - new area id that will become the writer
      * @param writeOptions - options that get sent with the new write client notification to the new area
@@ -439,8 +442,20 @@ export abstract class Connector extends EventEmitter {
             // disconnect gotti client too.
             client.channelClient.unlinkChannel();
             await this.onLeave(client, (code === WS_CLOSE_CONSENTED));
+            //TODO: notify gate server
         }
 
         this.emit('leave', client);
+    }
+
+
+    private registerGateResponders() {
+        /*
+        this.responder.createResponse('heartbeat', () => {
+            return [this.serverIndex, this.clients.length];
+        });
+
+        this.responder.createResponse('reserveSeat', this.requestJoin.bind(this))
+        */
     }
 }

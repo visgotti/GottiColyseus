@@ -1,6 +1,6 @@
 interface AreaRoom {
     id: string,
-    roomConstructor: () => T<any>;
+    roomConstructor: () => any;
     options: any, // sent to client in an { [areaId]: options } map when join
 }
 

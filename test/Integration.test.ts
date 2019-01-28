@@ -84,25 +84,22 @@ describe.only('Area and Connector Integration tests', () => {
         assert.ok(rejectRoom2);
 
         mockConnector1Options = {
-            server: http.createServer(),
-            roomId: 'test',
+            server: 'http',
+            port: 8080,
             serverIndex: 2,
-            masterURI: connector_1_uri,
-            channelIds: ['accept1', 'accept2', 'reject1', 'reject2'],
-            areaURIs: [area_1_uri, area_2_uri]
+            connectorURI: connector_1_uri,
+            areaRoomIds: ['accept1', 'accept2', 'reject1', 'reject2'],
+            areaServerURIs: [area_1_uri, area_2_uri]
         };
 
         mockConnector2Options = {
-            server: http.createServer(),
-            roomId: 'test',
+            server: 'http',
+            port: 8081,
             serverIndex: 3,
-            masterURI: connector_2_uri,
-            channelIds: ['accept1', 'accept2', 'reject1', 'reject2'],
-            areaURIs: [area_1_uri, area_2_uri]
+            connectorURI: connector_2_uri,
+            areaRoomIds: ['accept1', 'accept2', 'reject1', 'reject2'],
+            areaServerURIs: [area_1_uri, area_2_uri]
         };
-
-        mockConnector1Options.server.listen(8082);
-        mockConnector2Options.server.listen(8083);
 
         connector1 = new DummyConnector(mockConnector1Options);
         connector2 = new DummyConnector(mockConnector2Options);
@@ -199,7 +196,6 @@ describe.only('Area and Connector Integration tests', () => {
                 done();
             }, 20);
         });
-
 
         it('Client links then the area tells it to start writing to itself', (done) => {
             let changeAreaWriteSpy = sinon.spy(connector1, 'changeAreaWrite');
