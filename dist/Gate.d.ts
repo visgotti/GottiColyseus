@@ -1,7 +1,65 @@
+export interface ConnectorData {
+    URL: string;
+    serverIndex: number;
+    connectedClients: number;
+    gameId: string;
+    heartbeat?: Function;
+}
+export interface GameData {
+    connectorsData: Array<ConnectorData>;
+    id: string;
+    type: string;
+    region?: string;
+    options?: any;
+}
 export declare class Gate {
     urls: any[];
-    private onGateKeepHandler;
-    constructor(urls: Array<string>);
-    registerGateKeep(handler: (request: any, response: any) => {}): void;
+    private userDefinedMatchMaker;
+    private connectorsByServerIndex;
+    private gamesByType;
+    private gamesById;
+    private availableGamesByType;
+    private heartbeat;
+    constructor(gamesData: Array<GameData>);
+    /**
+     * Handles the request from a player for a certain game type. needs work
+     * right now the reuest has gameId and then the gate server will
+     * reserve a seat on a connector from the game with fewest connected clients
+     * @param req
+     * @param res
+     * @returns {Response|undefined}
+     */
+    gameRequested(req: any, res: any): Promise<any>;
+    private matchMake;
+    registerMatchMaker(handler: (gamesById: {
+        [id: string]: GameData;
+    }, options?: any) => boolean): void;
+    /**
+     * Returns lowest valued gameId in map.
+     * @param gamesById - Dictionary of available games for a certain game type
+     */
+    private defaultMatchMaker;
     gateKeep(req: any, res: any): void;
+    registerGateKeep(handler: (request: any, response: any) => any): void;
+    private onGateKeepHandler;
+    private validateGameRequest;
+    private getLeastPopulatedConnector;
+    private registerConnectorSubs;
+    /**
+     * Adds a player to the connector's count and then resorts the pool
+     * @param serverIndex - server index that the connector lives on.
+     */
+    private addPlayerToConnector;
+    /**
+     * Removes a player from the connector's count and then resorts the pool
+     * @param serverIndex - server index that the connector lives on.
+     */
+    private removePlayerFromConnector;
+    startConnectorHeartbeat(interval?: number): void;
+    stopConnectorHeartbeat(): void;
+    private handleHeartbeatError;
+    private handleHeartbeatResponse;
+    private formatGamesData;
+    private getClientCountOnConnector;
+    private getGameIdOfConnector;
 }

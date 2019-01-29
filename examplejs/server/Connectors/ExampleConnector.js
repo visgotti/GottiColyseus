@@ -1,4 +1,4 @@
-const { Connector } = require('../../dist');
+const { Connector } = require('../../../dist/index.d');
 
 module.exports = class ExampleConnector extends Connector {
     constructor(options) {

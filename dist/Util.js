@@ -75,6 +75,16 @@ function merge(a, ...objs) {
     return a;
 }
 exports.merge = merge;
+function sortByProperty(property) {
+    return function (a, b) {
+        if (a[property] < b[property])
+            return -1;
+        if (a[property] > b[property])
+            return 1;
+        return 0;
+    };
+}
+exports.sortByProperty = sortByProperty;
 function logError(err) {
     if (err) {
         console.error(`websocket error: ${err.message}\n${err.stack}`);

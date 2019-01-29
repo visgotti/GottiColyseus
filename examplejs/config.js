@@ -4,8 +4,8 @@
 
 const { Gate, AreaServer } = require('../dist');
 
-const ExampleAreaRoom = require('./server/ExampleAreaRoom');
-const ExampleConnector = require('./server/ExampleConnector');
+const ExampleAreaRoom = require('./server/AreaRooms/ExampleAreaRoom');
+const ExampleConnector = require('./server/Connectors/ExampleConnector');
 
 const connector_1_uri = 'tcp://127.0.0.1:4000';
 const connector_2_uri = 'tcp://127.0.0.1:4001';
@@ -13,6 +13,7 @@ const connector_2_uri = 'tcp://127.0.0.1:4001';
 const area_server_uri = 'tcp://127.0.0.1:5000';
 
 module.exports.connector1Options = {
+    constructorPath: '',
     server: 'http',
     port: 8081,
     roomId: 'test',

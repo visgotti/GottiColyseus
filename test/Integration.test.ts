@@ -1,17 +1,20 @@
 const msgpack = require('notepack.io');
-import { AreaServer } from '../src/AreaServer';
+import { AreaServer, Connector } from '../src';
 import { Protocol } from '../src/Protocol';
-import { AcceptsRequestsArea, RejectsRequestsArea, DummyConnector, createDummyConnectorClient } from './mock';
+import { createDummyConnectorClient } from './mock';
 import * as http from 'http';
 import * as sinon from 'sinon';
 import * as assert from 'assert';
 import * as mocha from 'mocha';
+import * as path from 'path';
 
 const connector_1_uri = 'tcp://127.0.0.1:4000';
 const connector_2_uri = 'tcp://127.0.0.1:4001';
 
 const area_1_uri = 'tcp://127.0.0.1:5000';
 const area_2_uri = 'tcp://127.0.0.1:5001';
+
+const gate_uri = 'tcp://127.0.0.1:7070';
 
 describe.only('Area and Connector Integration tests', () => {
 
@@ -35,22 +38,22 @@ describe.only('Area and Connector Integration tests', () => {
 
     before('constructs two connector servers and two area servers with 2 areas each and 2 clients.', (done) => {
         const acceptRoom1Options = {
-            RoomConstructor: AcceptsRequestsArea,
+            constructorPath: '/test/AreaRooms/AcceptRoom',
             id: 'accept1',
         };
 
         const rejectRoom1Options = {
-            RoomConstructor: RejectsRequestsArea,
+            constructorPath: '/test/AreaRooms/DeclineRoom',
             id: 'reject1',
         };
 
         const acceptRoom2Options = {
-            RoomConstructor: AcceptsRequestsArea,
+            constructorPath: '/test/AreaRooms/AcceptRoom',
             id: 'accept2',
         };
 
         const rejectRoom2Options = {
-            RoomConstructor: RejectsRequestsArea,
+            constructorPath: '/test/AreaRooms/DeclineRoom',
             id: 'reject2',
         };
 
@@ -67,6 +70,7 @@ describe.only('Area and Connector Integration tests', () => {
             connectorURIs: [connector_1_uri, connector_2_uri],
             areaURI: area_2_uri,
         };
+
         areaServer1 = new AreaServer(area1ServerOptions);
         acceptRoom1 = areaServer1.areas['accept1'];
         rejectRoom1 = areaServer1.areas['reject1'];
@@ -84,25 +88,33 @@ describe.only('Area and Connector Integration tests', () => {
         assert.ok(rejectRoom2);
 
         mockConnector1Options = {
+            constructorPath: '/Connectors/AcceptJoin',
             server: 'http',
             port: 8080,
             serverIndex: 2,
             connectorURI: connector_1_uri,
+            gateURI: gate_uri,
             areaRoomIds: ['accept1', 'accept2', 'reject1', 'reject2'],
             areaServerURIs: [area_1_uri, area_2_uri]
         };
 
         mockConnector2Options = {
+            constructorPath: '/Connectors/AcceptJoin',
             server: 'http',
             port: 8081,
             serverIndex: 3,
             connectorURI: connector_2_uri,
+            gateURI: gate_uri,
             areaRoomIds: ['accept1', 'accept2', 'reject1', 'reject2'],
             areaServerURIs: [area_1_uri, area_2_uri]
         };
 
-        connector1 = new DummyConnector(mockConnector1Options);
-        connector2 = new DummyConnector(mockConnector2Options);
+        const klass1 = require(path.join(__dirname, mockConnector1Options.constructorPath)).default;
+        const klass2 =  require(path.join(__dirname, mockConnector2Options.constructorPath)).default;
+
+        connector1 = new klass1(mockConnector1Options);
+        connector2 = new klass2(mockConnector2Options);
+
         assert.ok(connector1);
         assert.ok(connector2);
 

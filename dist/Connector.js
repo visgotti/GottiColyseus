@@ -349,9 +349,19 @@ class Connector extends events_1.EventEmitter {
                 // disconnect gotti client too.
                 client.channelClient.unlinkChannel();
                 yield this.onLeave(client, (code === Protocol_1.WS_CLOSE_CONSENTED));
+                //TODO: notify gate server
             }
             this.emit('leave', client);
         });
+    }
+    registerGateResponders() {
+        /*
+        this.responder.createResponse('heartbeat', () => {
+            return [this.serverIndex, this.clients.length];
+        });
+
+        this.responder.createResponse('reserveSeat', this.requestJoin.bind(this))
+        */
     }
 }
 exports.Connector = Connector;

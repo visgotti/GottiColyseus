@@ -1,4 +1,4 @@
-const { AreaRoom } = require('../../dist');
+const { AreaRoom } = require('../../../dist/index.d');
 
 
 module.exports = class ExampleAreaRoom extends AreaRoom {

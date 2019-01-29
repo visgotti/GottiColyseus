@@ -41,13 +41,16 @@ export const enum Protocol {
         // Generic messages (50~60)
     BAD_REQUEST = 50,
 
+
         // WebSocket error codes
     WS_SERVER_DISCONNECT = 4201,
     WS_TOO_MANY_CLIENTS = 4202,
 }
 
-export const enum GateProtocols {
-    CLIENT_REQUEST_CONNECTOR,
+export const enum GateProtocol {
+    // Gate Communication 61-70
+    RESERVE_PLAYER_SEAT = '1',
+    HEARTBEAT = '2',
 }
 
 export enum StateProtocol {
@@ -71,7 +74,4 @@ export function send(client: ConnectorClient, message: any, encode: boolean = tr
     if (client.readyState === WebSocket.OPEN) {
         client.send((encode && msgpack.encode(message)) || message, { binary: true });
     }
-}
-
-export const GateProtocols = {
 }

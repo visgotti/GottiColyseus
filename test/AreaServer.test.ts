@@ -17,14 +17,14 @@ describe('AreaServer', () => {
     let server;
 
     beforeEach('constructs an area server', (done) => {
-
         const area1Options = {
-            RoomConstructor: AcceptsRequestsArea,
+            constructorPath: '/test/AreaRooms/mockArea',
+          //  RoomConstructor: AcceptsRequestsArea,
             id: 'accepts',
         };
 
         const area2Options = {
-            RoomConstructor: RejectsRequestsArea,
+            constructorPath: '/test/AreaRooms/mockArea',
             id: 'rejects',
         };
 

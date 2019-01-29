@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { AreaRoom } from './AreaRoom';
 
 import { BackMaster, BackChannel } from 'gotti-channels/dist';
@@ -8,7 +9,8 @@ export type PublicAreaOptions = {
 }
 
 export type AreaOption = {
-    RoomConstructor: any,
+    constructorPath: string,
+    constructorExportName?: string,
     id: string,
     publicOptions?: PublicAreaOptions
 }
@@ -37,7 +39,15 @@ export class AreaServer {
 
         options.areas.forEach(area => {
             this.masterChannel.backChannels[area.id].connectionOptions = area.publicOptions;
-            const room = new area.RoomConstructor(area.id);
+            let klass = require(path.join(__dirname, '..', area.constructorPath));
+
+            if(klass['default']) {
+                klass = klass['default'];
+            } else if(area.constructorExportName) {
+                klass = klass[area.constructorExportName];
+            }
+
+            const room = new klass(area.id);
             room.initializeChannels(this.masterChannel, this.masterChannel.backChannels[area.id]);
             this.areas[area.id] = room;
         });

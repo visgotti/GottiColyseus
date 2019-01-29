@@ -1,122 +1,192 @@
-import { Config } from './Config';
+import { Messenger as Requester, Broker } from 'gotti-reqres/dist';
 
 import { sortByProperty } from './Util';
 
 export interface ConnectorData {
+    URL: string,
+    serverIndex: number,
     connectedClients: number,
-    game: GameData;
-    region?: string,
+    gameId: string;
+    heartbeat?: Function;
 }
 
-export type GameTypeData = {[gameId: string]: GameData }
-
 export interface GameData {
-    connectors: Array<ConnectorData>;
+    connectorsData: Array<ConnectorData>;
+    id: string,
+    type: string,
+    region?: string,
+    options?: any,
 }
 
 export class Gate {
     public urls = [];
-    private onGateKeepHandler: Function;
-    private connectors: { [id: string]: ConnectorData } = {};
-    private gamesByType: any = {};
 
-    constructor(config: Config) {
-        this.connectors = rgis
+    private userDefinedMatchMaker: Function = null;
+
+    private connectorsByServerIndex: { [serverIndex: number]: ConnectorData } = {};
+    private gamesByType: { [type: string]: GameData } = {};
+    private gamesById: { [id: string]: GameData} = {};
+
+    private requestBroker: Broker;
+    private requester: Requester;
+
+    // data sent to client when authenticated
+    private availableGamesByType: Array<string>;
+
+    private heartbeat: NodeJS.Timer = null;
+
+    constructor(gateURI: string, gamesData: Array<GameData>) {
+        let formatted = this.formatGamesData(gamesData);
+        this.requestBroker = new Broker(gateURI, 'gate');
+
+        this.requester = new Requester({
+            id: 'gate_requester',
+            brokerURI: gateURI,
+            request: { timeout: 1000 }
+        });
+
+        this.gamesByType = formatted.gamesByType;
+        this.gamesById = formatted.gamesById;
+        this.availableGamesByType = formatted.availableGamesByType;
+        this.connectorsByServerIndex = formatted.connectorsByServerIndex;
+
         this.gateKeep = this.gateKeep.bind(this);
         this.gameRequested = this.gameRequested.bind(this);
 
         this.gamesByType = {};
     }
 
-    public registerGameResponder(handler: (gameType, gameRegion?, options?) => {}) {
-        this.onGameRequestHandler = handler;
-    }
-
-    public registerGateKeep(handler: (request, response) => {}) {
-        this.onGateKeepHandler = handler;
-        this.onGateKeepHandler = this.onGateKeepHandler.bind(this);
-    }
-
+    /**
+     * Handles the request from a player for a certain game type. needs work
+     * right now the reuest has gameId and then the gate server will
+     * reserve a seat on a connector from the game with fewest connected clients
+     * @param req
+     * @param res
+     * @returns {Response|undefined}
+     */
     public async gameRequested(req, res) {
         const validated = this.validateGameRequest(req);
 
-        if(!(validated.gameType)) {
-            return res.status(validated.code).json(validated.message);
+        if(validated.error) {
+            return res.status(validated.code).json(validated.error);
         }
 
-        const { gameType, gameRegion, options } = validated;
+        const { gameType, options } = validated;
 
-        const userValidated = await this.onGameRequestHandler(gameType, gameRegion, options);
+        const url = await this.matchMake(gameType, options);
+        return res.status(200).json(url);
+    }
 
+    private async matchMake(gameType, options?) : Promise<any> {
+        let foundGameId = null;
+
+        if(this.userDefinedMatchMaker) {
+            foundGameId = this.userDefinedMatchMaker(this.availableGamesByType[gameType], options);
+        }
+
+        const userValidated = await this.matchMake(gameType, options);
         if(!(userValidated)) {
-            let errCode = userValidated.code | 404;
-            let errMessage = userValidated.message | 'Error requesting game';
-            res.status(errCode).json(errMessage);
+         //   return res.status(400).json('Error requesting game.');
         } else {
             //todo: implement my req/res socket lib to send request to channel to reserve seat for client
             //let connected = await this.connectPlayer(connectorGateURI)
             // if(connected)
 
             // gets first element in connector since it's always sorted.
-            const connectorData = this.gamesByType[gameType].connectors[0];
-
-            res.status(200).json(URI);
+            const connectorData = this.gamesByType[gameType].connectorsData[0];
+            this.addPlayerToConnector(connectorData.serverIndex);
         }
     }
 
-    // by default it automatically returns true
-    private onGameRequestHandler(gameType, gameRegion, options) {
-        return true;
+    public registerMatchMaker(handler: (gamesById: { [id: string]: GameData}, options?) => boolean) {
+        this.userDefinedMatchMaker = handler;
+    }
+
+    /**
+     * Returns lowest valued gameId in map.
+     * @param gamesById - Dictionary of available games for a certain game type
+     */
+    private defaultMatchMaker(gamesById: { [id: string]: GameData}) {
+        // returns game id with smallest valued id
+        let lowest = null;
+        Object.keys(gamesById).forEach(gId => {
+            if(lowest === null) {
+                lowest = gId;
+            } else {
+                if(gId < lowest) {
+                    lowest = gId;
+                }
+            }
+        });
+        if(lowest === null) {
+            throw new Error('No available games were presented in the match maker.');
+        }
+        return lowest;
     }
 
     public gateKeep(req, res) {
         if(this.onGateKeepHandler(req, res)) {
-            res.status(200).json(this.urls)
+            res.status(200).json({ games: this.availableGamesByType })
         } else {
-            res.status(401).json(this.urls);
+            res.status(401).json('Error authenticating');
         }
     }
+    public registerGateKeep(handler: (request, response) => any) {
+        this.onGateKeepHandler = handler;
+        this.onGateKeepHandler = this.onGateKeepHandler.bind(this);
+    }
+    private onGateKeepHandler(req, res) : any {
+        return true
+    }
 
-    private validateGameRequest(req) {
-        if(!(req.body) || !(req.body['gameType']) || !(req.body['gameType'] in this.gamesByType)) {
-            return { code: 400, message: 'Bad request.' }
+    private validateGameRequest(req) : any {
+        if(!(req.body) || !(req.body['gameType']) || !(req.body['gameType'] in this.gamesById)) {
+            return { error: 'Bad request', code: 400 }
         }
-
-        return { gameType: req.body.gameType, gameRegion: req.body.gameRegion };
+        return { gameType: this.gamesById[req.body['gameType']], options: req.body.options };
     }
 
-    private onGateKeepHandler(gameType, gameRegion) {
-    }
-
-    private getLeastPopulatedConnector(gameType, gameRegion?) {
-        const { connectors } = this.gamesByType[gameType];
-        const connectorData = connectors[0];
+    // gets connector for game type
+    private getLeastPopulatedConnector(gameId) {
+        const { connectorsData } = this.gamesById[gameId];
+        const connectorData = connectorsData[0];
     }
 
     private registerConnectorSubs() {
         // this.subscriber.createSubscription(connectorId, 'player_joined', this.addPlayerToConnector.bind(null, connectorId))
     }
 
-    private addPlayerToConnector(connectorId) {
-        const connectorData = this.connectors[connectorId];
+    /**
+     * Adds a player to the connector's count and then resorts the pool
+     * @param serverIndex - server index that the connector lives on.
+     */
+    private addPlayerToConnector(serverIndex) {
+        const connectorData = this.connectorsByServerIndex[serverIndex];
         connectorData.connectedClients++;
 
         //sorts
-        connectorData.game.connectors.sort(sortByProperty('connectedClients'))
+        this.gamesById[connectorData.gameId].connectorsData.sort(sortByProperty('connectedClients'))
     }
 
-    private removePlayerFromConnector(connectorId) {
-        const connectorData = this.connectors[connectorId];
-        connectorData.connectedClients++;
+    /**
+     * Removes a player from the connector's count and then resorts the pool
+     * @param serverIndex - server index that the connector lives on.
+     */
+    private removePlayerFromConnector(serverIndex) {
+        const connectorData = this.connectorsByServerIndex[serverIndex];
+        connectorData.connectedClients--;
 
         //sorts
-        connectorData.game.connectors.sort(sortByProperty('connectedClients'))
+        this.gamesById[connectorData.gameId].connectorsData.sort(sortByProperty('connectedClients'))
     }
 
     public startConnectorHeartbeat(interval=100000) {
+        if(this.heartbeat) {
+            this.stopConnectorHeartbeat();
+        }
         this.heartbeat = setInterval(async() => {
-            const heartbeats = Object.keys(this.connectors).map(key => {
-                return this.connectors[key].heartbeat;
+            const heartbeats = Object.keys(this.connectorsByServerIndex).map(key => {
+                return this.connectorsByServerIndex[key].heartbeat;
             });
 
             // https://stackoverflow.com/questions/31424561/wait-until-all-es6-promises-complete-even-rejected-promises/36115549#36115549
@@ -126,30 +196,66 @@ export class Gate {
                     let resLen = results.length;
                     while (resLen--) {
                         if (!(results[resLen].error)) {
-
                         } else {
                             this.handleHeartbeatResponse(results[resLen]);
                         }
                     }
                 })
-
-
         }, interval);
     }
 
-    private handleHeartbeatError(connector)
+    public stopConnectorHeartbeat() {
+        clearTimeout(this.heartbeat);
+    }
+
+    private handleHeartbeatError(connector) {
+    }
 
     private handleHeartbeatResponse(response) {
-       const connectorData = this.connectors[response[0]];
+       const connectorData = this.connectorsByServerIndex[response[0]];
        if(connectorData.connectedClients !== response[1]) {
            console.warn('the connected clients on gate did not match the count on the connector ', connectorData);
            connectorData.connectedClients = response[1];
-           connectorData.game.connectors.sort(sortByProperty('connectedClients'))
+           this.gamesById[connectorData.gameId].connectorsData.sort(sortByProperty('connectedClients'))
        }
     }
 
-    private stopConnectorHeartbeat()
+    private formatGamesData(gamesData: Array<GameData>) : any {
+        let gamesByType: any = {};
+        let gamesById: any = {};
+        let connectorsByServerIndex: any = {};
 
-    private initializeConnectorData(config: Config) : Array<ConnectorData> {}
-    private initializeGameData(config: Config) {};
+        let availableGamesByType = {};
+
+        gamesData.forEach(g => {
+            if(!(g.type in gamesByType)) {
+                gamesByType[g.type] = [];
+                availableGamesByType[g.type] = [];
+            }
+            if(g.id in gamesById) {
+                throw new Error(`Multiple games with the same id: ${g.id}`);
+            }
+
+            availableGamesByType[g.type].push(g.id);
+            gamesById[g.id] = g;
+            gamesByType[g.type].push(g);
+
+            g.connectorsData.forEach(c => {
+                if(c.serverIndex in connectorsByServerIndex) {
+                    throw new Error(`different games ${ connectorsByServerIndex[c.serverIndex].gameId } and ${g.id} are using the same connector ${c.serverIndex}`)
+                }
+                connectorsByServerIndex[c.serverIndex] = c;
+            });
+        });
+
+        return  { gamesById, gamesByType, connectorsByServerIndex, availableGamesByType }
+    }
+
+    private getClientCountOnConnector(serverIndex) {
+        return this.connectorsByServerIndex[serverIndex].connectedClients;
+    }
+
+    private getGameIdOfConnector(serverIndex) {
+        return this.connectorsByServerIndex[serverIndex].gameId;
+    }
 }

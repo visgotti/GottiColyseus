@@ -102,4 +102,5 @@ export declare abstract class Connector extends EventEmitter {
     private _requestAreaWrite;
     private _onJoin;
     private _onLeave;
+    private registerGateResponders;
 }

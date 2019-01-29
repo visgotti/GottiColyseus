@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const path = require("path");
 const dist_1 = require("gotti-channels/dist");
 class AreaServer {
     constructor(options) {
@@ -13,7 +14,9 @@ class AreaServer {
         this.masterChannel.addChannels(areaIds);
         options.areas.forEach(area => {
             this.masterChannel.backChannels[area.id].connectionOptions = area.publicOptions;
-            const room = new area.RoomConstructor(area.id);
+            const klass = require(path.resolve(__dirname, area.klass));
+            console.log('klass was', klass);
+            const room = new klass(area.id);
             room.initializeChannels(this.masterChannel, this.masterChannel.backChannels[area.id]);
             this.areas[area.id] = room;
         });

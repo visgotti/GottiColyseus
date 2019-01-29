@@ -19,8 +19,10 @@ import { merge, spliceOne } from './Util';
 import * as WebSocket from 'ws';
 import { ServerOptions as IServerOptions } from 'ws';
 
+import { Messenger as Responder } from 'gotti-reqres/dist';
+
 import { FrontMaster, Client as ChannelClient } from 'gotti-channels/dist';
-import { decode, Protocol, send, WS_CLOSE_CONSENTED  } from './Protocol';
+import { decode, Protocol, GateProtocol, send, WS_CLOSE_CONSENTED  } from './Protocol';
 
 import * as fossilDelta from 'fossil-delta';
 
@@ -41,6 +43,7 @@ const DEFAULT_SEAT_RESERVATION_TIME = 3;
 export type SimulationCallback = (deltaTime?: number) => void;
 
 export type ConnectorOptions = IServerOptions & {
+    constructorPath: string,
     pingTimeout?: number,
     verifyClient?: WebSocket.VerifyClientCallbackAsync
     gracefullyShutdown?: boolean,
@@ -48,8 +51,9 @@ export type ConnectorOptions = IServerOptions & {
     port?: number,
     serverIndex: number,
     connectorURI: string,
+    gateURI: string,
     areaRoomIds: Array<string>,
-    areaServerURIs: Array<string>
+    areaServerURIs: Array<string>,
 };
 
 export interface RoomAvailable {
@@ -90,9 +94,13 @@ export abstract class Connector extends EventEmitter {
     private _patchInterval: NodeJS.Timer;
 
     private server: any;
+    private gateURI: string;
+    private responder: Responder;
+    private reservedSeats: {[clientId: string]: any}
 
     constructor(options: ConnectorOptions) {
         super();
+
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
         this.areaServerURIs = options.areaServerURIs;
@@ -109,26 +117,24 @@ export abstract class Connector extends EventEmitter {
             throw 'please use http or net as server option'
         }
 
+        this.responder = new Responder({
+            id: `${this.serverIndex}_responder`,
+            brokerURI: options.gateURI,
+        });
+
         //this.setPatchRate(this.patchRate);
     }
 
     protected onConnection = (client: Client, req?: http.IncomingMessage & any) => {
         const upgradeReq = req || client.upgradeReq;
-        client.id = nanoid(9);
         client.pingCount = 0;
 
-        client.options = upgradeReq.options;
-        client.auth = upgradeReq.auth;
 
-        const auth = this.onAuth(client.options);
-        if(!(auth)) {
-           // send(client, [Protocol.JOIN_CONNECTOR_ERROR])
-        }
-
-        //TODO isnew
-        const joinedOptions = this.requestJoin(auth, false);
-        if(joinedOptions) {
-            this._onJoin(client, joinedOptions, auth);
+        if(!(client.auth) || !(client.auth.id) || !(this.reservedSeats[client.auth.id]) ) {
+            // send(client, [Protocol.JOIN_CONNECTOR_ERROR])
+        } else {
+            const { auth, options } = client;
+            this._onJoin(client, auth, options);
         }
 
         // prevent server crashes if a single client had unexpected error
@@ -172,12 +178,19 @@ export abstract class Connector extends EventEmitter {
 
     // Optional abstract methods
     public onInit?(options: any): void;
-    public onJoin?(client: Client, options?: any, auth?: any): void | Promise<any>;
+
+    // auth is the data that was sent from the gate channel and options is any data passed from client on connection
+    public onJoin?(client: Client, any, auth: any,  options?): void | Promise<any>;
     public onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     public onDispose?(): void | Promise<any>;
     public onAuth?(options: any): boolean;
 
-    public requestJoin(options: any, isNew?: boolean): number | boolean {
+    /**
+     * @param clientId - id client authenticated from gate server as
+     * @param auth - authentication data sent from Gate server.
+     * @returns {number}
+     */
+    public requestJoin(clientId: string, auth: any): number | boolean {
         return 1;
     }
 
@@ -417,8 +430,12 @@ export abstract class Connector extends EventEmitter {
         frontChannel.send([Protocol.REQUEST_WRITE_AREA, newAreaId, options], client.channelClient.processorChannel, client.id);
     }
 
-    private _onJoin(client: Client, options?: any, auth?: any) {
-        // create remote client instance.
+
+    private _onJoin(client: Client, auth: any, options?: any,) {
+
+        // clear the timeout and remove the reserved seat since player joined
+        clearInterval(this.reservedSeats[auth.id].timeout);
+        delete this.reservedSeats[auth.id];
 
         // add a channelClient to client
         client.channelClient = new ChannelClient(client.sessionId || client.id, this.masterChannel);
@@ -448,14 +465,39 @@ export abstract class Connector extends EventEmitter {
         this.emit('leave', client);
     }
 
+    /**
+     * reserves seat till player joins
+     * @param clientId - id of player to reserve seat for
+     * @param auth - data player authenticated with on gate.
+     * @private
+     */
+    private _reserveSeat(clientId, auth) {
+        this.reservedSeats[clientId] = auth;
+    }
 
+    /**
+     * Handles request from gate server, whatever this returns gets sent back to the gate server
+     * to notify it if the reserve seat request went through or not.
+     * @param data - data sent from gate server after play authenticated
+     * @private
+     */
+    private _requestJoin(data) {
+        const clientId = data[0];
+        const auth = data[1];
+
+        if(this.requestJoin(clientId, auth)) {
+            this._reserveSeat(clientId, auth);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    //TODO: maybe need to ping gate before?
     private registerGateResponders() {
-        /*
-        this.responder.createResponse('heartbeat', () => {
+        this.responder.createResponse(GateProtocol.HEARTBEAT, () => {
             return [this.serverIndex, this.clients.length];
         });
-
-        this.responder.createResponse('reserveSeat', this.requestJoin.bind(this))
-        */
+        this.responder.createResponse(GateProtocol.RESERVE_PLAYER_SEAT, this._requestJoin.bind(this))
     }
 }

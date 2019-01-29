@@ -6,7 +6,7 @@ const { Gate, AreaServer } = require('../dist');
 
 const { connector1Options, connector2Options, areaServerOptions } = require('./config');
 
-const ExampleConnector = require('./server/ExampleConnector');
+const ExampleConnector = require('./server/Connectors/ExampleConnector');
 const exampleConnector1 = new ExampleConnector(connector1Options);
 const exampleConnector2 = new ExampleConnector(connector2Options);
 
@@ -18,8 +18,6 @@ const server = http.createServer(app);
 const gate = new Gate(['127.0.0.1:8080', '127.0.0.1:8081']);
 
 const port = 8080;
-
-const exampleArea1Options =
 
 gate.registerGateKeep((req, res) => {
     if(req) {
@@ -49,4 +47,4 @@ setTimeout(() => {
                 console.log('listening on port...', port);
             });
         })
-});
+}, 100);

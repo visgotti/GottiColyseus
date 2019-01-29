@@ -5,9 +5,10 @@ export declare type PublicAreaOptions = {
     options: any;
 };
 export declare type AreaOption = {
-    RoomConstructor: any;
+    RoomConstructor?: any;
     id: string;
     publicOptions?: PublicAreaOptions;
+    klass: string;
 };
 export declare type AreaServerOptions = {
     serverIndex: number;
