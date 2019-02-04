@@ -5,10 +5,10 @@ export declare type PublicAreaOptions = {
     options: any;
 };
 export declare type AreaOption = {
-    RoomConstructor?: any;
+    constructorPath: string;
+    constructorExportName?: string;
     id: string;
-    publicOptions?: PublicAreaOptions;
-    klass: string;
+    options?: PublicAreaOptions;
 };
 export declare type AreaServerOptions = {
     serverIndex: number;

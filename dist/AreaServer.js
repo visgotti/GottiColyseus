@@ -13,9 +13,14 @@ class AreaServer {
         });
         this.masterChannel.addChannels(areaIds);
         options.areas.forEach(area => {
-            this.masterChannel.backChannels[area.id].connectionOptions = area.publicOptions;
-            const klass = require(path.resolve(__dirname, area.klass));
-            console.log('klass was', klass);
+            this.masterChannel.backChannels[area.id].connectionOptions = area.options;
+            let klass = require(path.join(__dirname, area.constructorPath));
+            if (klass['default']) {
+                klass = klass['default'];
+            }
+            else if (area.constructorExportName) {
+                klass = klass[area.constructorExportName];
+            }
             const room = new klass(area.id);
             room.initializeChannels(this.masterChannel, this.masterChannel.backChannels[area.id]);
             this.areas[area.id] = room;

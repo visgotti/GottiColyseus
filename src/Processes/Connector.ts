@@ -9,7 +9,7 @@ let areaServer = null;
 
 if(action === 'start') {
     const klass = require(path.join(__dirname, '..', options.constructorPath));
-    const room = new klass(area.id);
+    const room = new klass(options.id);
     const Connector = new klass(options);
 } else if(action === 'stop') {
     process.exit();

@@ -24,8 +24,9 @@ export declare const enum Protocol {
     WS_SERVER_DISCONNECT = 4201,
     WS_TOO_MANY_CLIENTS = 4202
 }
-export declare const enum GateProtocols {
-    CLIENT_REQUEST_CONNECTOR = 0
+export declare const enum GateProtocol {
+    RESERVE_PLAYER_SEAT = "1",
+    HEARTBEAT = "2"
 }
 export declare enum StateProtocol {
     SET = 0,

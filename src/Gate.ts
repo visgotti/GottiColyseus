@@ -18,6 +18,11 @@ export interface GameData {
     options?: any,
 }
 
+export interface GateConfig {
+    gateURI: string,
+    gamesData: Array<GameData>,
+}
+
 export class Gate {
     public urls = [];
 
@@ -35,13 +40,18 @@ export class Gate {
 
     private heartbeat: NodeJS.Timer = null;
 
-    constructor(gateURI: string, gamesData: Array<GameData>) {
-        let formatted = this.formatGamesData(gamesData);
-        this.requestBroker = new Broker(gateURI, 'gate');
+    constructor() {
+        this.gateKeep = this.gateKeep.bind(this);
+        this.gameRequested = this.gameRequested.bind(this);
+    }
+
+    public initializeServer(config: GateConfig) {
+        let formatted = this.formatGamesData(config.gamesData);
+        this.requestBroker = new Broker(config.gateURI, 'gate');
 
         this.requester = new Requester({
             id: 'gate_requester',
-            brokerURI: gateURI,
+            brokerURI: config.gateURI,
             request: { timeout: 1000 }
         });
 
@@ -49,10 +59,6 @@ export class Gate {
         this.gamesById = formatted.gamesById;
         this.availableGamesByType = formatted.availableGamesByType;
         this.connectorsByServerIndex = formatted.connectorsByServerIndex;
-
-        this.gateKeep = this.gateKeep.bind(this);
-        this.gameRequested = this.gameRequested.bind(this);
-
         this.gamesByType = {};
     }
 
@@ -65,6 +71,10 @@ export class Gate {
      * @returns {Response|undefined}
      */
     public async gameRequested(req, res) {
+        if(!(req.auth)) {
+            return res.status(500).json({ error: 'unauthenticated' });
+        }
+
         const validated = this.validateGameRequest(req);
 
         if(validated.error) {
@@ -74,32 +84,41 @@ export class Gate {
         const { gameType, options } = validated;
 
         const url = await this.matchMake(gameType, options);
-        return res.status(200).json(url);
+
+        if(url) {
+            return res.status(200).json(url);
+        } else {
+            return res.status(500).json('Invalid request');
+        }
     }
 
     private async matchMake(gameType, options?) : Promise<any> {
-        let foundGameId = null;
-
-        if(this.userDefinedMatchMaker) {
-            foundGameId = this.userDefinedMatchMaker(this.availableGamesByType[gameType], options);
+        if(!(this.userDefinedMatchMaker)) {
+            throw new Error('Please define a match making function using registerMathMaker');
         }
 
-        const userValidated = await this.matchMake(gameType, options);
-        if(!(userValidated)) {
-         //   return res.status(400).json('Error requesting game.');
-        } else {
-            //todo: implement my req/res socket lib to send request to channel to reserve seat for client
-            //let connected = await this.connectPlayer(connectorGateURI)
-            // if(connected)
+        let foundGameId = this.userDefinedMatchMaker(this.availableGamesByType[gameType], options);
 
-            // gets first element in connector since it's always sorted.
-            const connectorData = this.gamesByType[gameType].connectorsData[0];
-            this.addPlayerToConnector(connectorData.serverIndex);
+        if(!foundGameId) {
+            return false;
         }
+
+        //todo: implement my req/res socket lib to send request to channel to reserve seat for client
+        //let connected = await this.connectPlayer(connectorGateURI)
+        // if(connected)
+
+
+
+        // gets first element in connector since it's always sorted.
+        const connectorData = this.gamesByType[gameType].connectorsData[0];
+        this.addPlayerToConnector(connectorData.serverIndex);
+
+        return connectorData.URL;
     }
 
     public registerMatchMaker(handler: (gamesById: { [id: string]: GameData}, options?) => boolean) {
         this.userDefinedMatchMaker = handler;
+        this.userDefinedMatchMaker = this.userDefinedMatchMaker.bind(this);
     }
 
     /**

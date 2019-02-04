@@ -12,7 +12,7 @@ export type AreaOption = {
     constructorPath: string,
     constructorExportName?: string,
     id: string,
-    publicOptions?: PublicAreaOptions
+    options?: PublicAreaOptions
 }
 
 export type AreaServerOptions = {
@@ -38,8 +38,8 @@ export class AreaServer {
         this.masterChannel.addChannels(areaIds);
 
         options.areas.forEach(area => {
-            this.masterChannel.backChannels[area.id].connectionOptions = area.publicOptions;
-            let klass = require(path.join(__dirname, '..', area.constructorPath));
+            this.masterChannel.backChannels[area.id].connectionOptions = area.options;
+            let klass = require(path.join(__dirname, area.constructorPath));
 
             if(klass['default']) {
                 klass = klass['default'];

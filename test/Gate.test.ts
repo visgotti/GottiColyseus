@@ -51,11 +51,16 @@ const mockGamesData = [
     }
 ] as Array<GameData>;
 
+const gateConfig = {
+    gateURI,
+    gamesData: mockGamesData
+};
+
 describe('Gate', () => {
     let gate;
 
     before('Creates Gate instance', (done) => {
-        gate = new Gate(gateURI, mockGamesData);
+        gate = new Gate(gateConfig);
         done();
     });
 

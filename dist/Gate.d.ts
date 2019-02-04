@@ -12,15 +12,22 @@ export interface GameData {
     region?: string;
     options?: any;
 }
+export interface GateConfig {
+    gateURI: string;
+    gamesData: Array<GameData>;
+}
 export declare class Gate {
     urls: any[];
     private userDefinedMatchMaker;
     private connectorsByServerIndex;
     private gamesByType;
     private gamesById;
+    private requestBroker;
+    private requester;
     private availableGamesByType;
     private heartbeat;
-    constructor(gamesData: Array<GameData>);
+    constructor();
+    initializeServer(config: GateConfig): void;
     /**
      * Handles the request from a player for a certain game type. needs work
      * right now the reuest has gameId and then the gate server will

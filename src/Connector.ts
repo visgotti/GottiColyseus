@@ -43,11 +43,10 @@ const DEFAULT_SEAT_RESERVATION_TIME = 3;
 export type SimulationCallback = (deltaTime?: number) => void;
 
 export type ConnectorOptions = IServerOptions & {
-    constructorPath: string,
     pingTimeout?: number,
     verifyClient?: WebSocket.VerifyClientCallbackAsync
     gracefullyShutdown?: boolean,
-    server: 'string',
+    server: string,
     port?: number,
     serverIndex: number,
     connectorURI: string,
@@ -96,7 +95,7 @@ export abstract class Connector extends EventEmitter {
     private server: any;
     private gateURI: string;
     private responder: Responder;
-    private reservedSeats: {[clientId: string]: any}
+    private reservedSeats: {[clientId: string]: any};
 
     constructor(options: ConnectorOptions) {
         super();

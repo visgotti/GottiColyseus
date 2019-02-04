@@ -16,7 +16,7 @@ const area_2_uri = 'tcp://127.0.0.1:5001';
 
 const gate_uri = 'tcp://127.0.0.1:7070';
 
-describe.only('Area and Connector Integration tests', () => {
+describe('Area and Connector Integration tests', () => {
 
     let areaServer1 = null;
     let areaServer2 = null;

@@ -20,10 +20,11 @@ export declare type ConnectorOptions = IServerOptions & {
     pingTimeout?: number;
     verifyClient?: WebSocket.VerifyClientCallbackAsync;
     gracefullyShutdown?: boolean;
-    server: 'string';
+    server: string;
     port?: number;
     serverIndex: number;
     connectorURI: string;
+    gateURI: string;
     areaRoomIds: Array<string>;
     areaServerURIs: Array<string>;
 };
@@ -60,6 +61,9 @@ export declare abstract class Connector extends EventEmitter {
     };
     private _patchInterval;
     private server;
+    private gateURI;
+    private responder;
+    private reservedSeats;
     constructor(options: ConnectorOptions);
     protected onConnection: (client: any, req?: any) => void;
     connectToAreas(): Promise<boolean>;
@@ -68,11 +72,16 @@ export declare abstract class Connector extends EventEmitter {
     onRemovedAreaListen?(client: any, areaId: string, options?: any): void | Promise<any>;
     onChangedAreaWrite?(client: any, newAreaId: string, oldAreaId?: string): void | Promise<any>;
     onInit?(options: any): void;
-    onJoin?(client: Client, options?: any, auth?: any): void | Promise<any>;
+    onJoin?(client: Client, any: any, auth: any, options?: any): void | Promise<any>;
     onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     onDispose?(): void | Promise<any>;
     onAuth?(options: any): boolean;
-    requestJoin(options: any, isNew?: boolean): number | boolean;
+    /**
+     * @param clientId - id client authenticated from gate server as
+     * @param auth - authentication data sent from Gate server.
+     * @returns {number}
+     */
+    requestJoin(clientId: string, auth: any): number | boolean;
     send(client: Client, data: any): void;
     disconnect(closeHttp?: boolean): Promise<boolean>;
     protected broadcast(data: any, options?: BroadcastOptions): boolean;
@@ -102,5 +111,19 @@ export declare abstract class Connector extends EventEmitter {
     private _requestAreaWrite;
     private _onJoin;
     private _onLeave;
+    /**
+     * reserves seat till player joins
+     * @param clientId - id of player to reserve seat for
+     * @param auth - data player authenticated with on gate.
+     * @private
+     */
+    private _reserveSeat;
+    /**
+     * Handles request from gate server, whatever this returns gets sent back to the gate server
+     * to notify it if the reserve seat request went through or not.
+     * @param data - data sent from gate server after play authenticated
+     * @private
+     */
+    private _requestJoin;
     private registerGateResponders;
 }

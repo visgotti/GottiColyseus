@@ -1,6 +1,6 @@
 import { AreaServer } from '../src/AreaServer';
 
-import { AcceptsRequestsArea, RejectsRequestsArea } from './mock';
+//import { AcceptsRequestsArea, RejectsRequestsArea } from './mock';
 import * as http from 'http';
 import * as sinon from 'sinon';
 import * as assert from 'assert';

@@ -1,29 +1,30 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+const dist_1 = require("gotti-reqres/dist");
 const Util_1 = require("./Util");
 class Gate {
-    constructor(gamesData) {
+    constructor() {
         this.urls = [];
         this.userDefinedMatchMaker = null;
         this.connectorsByServerIndex = {};
         this.gamesByType = {};
         this.gamesById = {};
         this.heartbeat = null;
-        let formatted = this.formatGamesData(gamesData);
+        this.gateKeep = this.gateKeep.bind(this);
+        this.gameRequested = this.gameRequested.bind(this);
+    }
+    initializeServer(config) {
+        let formatted = this.formatGamesData(config.gamesData);
+        this.requestBroker = new dist_1.Broker(config.gateURI, 'gate');
+        this.requester = new dist_1.Messenger({
+            id: 'gate_requester',
+            brokerURI: config.gateURI,
+            request: { timeout: 1000 }
+        });
         this.gamesByType = formatted.gamesByType;
         this.gamesById = formatted.gamesById;
         this.availableGamesByType = formatted.availableGamesByType;
         this.connectorsByServerIndex = formatted.connectorsByServerIndex;
-        this.gateKeep = this.gateKeep.bind(this);
-        this.gameRequested = this.gameRequested.bind(this);
         this.gamesByType = {};
     }
     /**
@@ -34,36 +35,38 @@ class Gate {
      * @param res
      * @returns {Response|undefined}
      */
-    gameRequested(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const validated = this.validateGameRequest(req);
-            if (validated.error) {
-                return res.status(validated.code).json(validated.error);
-            }
-            const { gameType, options } = validated;
-            const url = yield this.matchMake(gameType, options);
+    async gameRequested(req, res) {
+        if (!(req.auth)) {
+            return res.status(500).json({ error: 'unauthenticated' });
+        }
+        const validated = this.validateGameRequest(req);
+        if (validated.error) {
+            return res.status(validated.code).json(validated.error);
+        }
+        const { gameType, options } = validated;
+        const url = await this.matchMake(gameType, options);
+        if (url) {
             return res.status(200).json(url);
-        });
+        }
+        else {
+            return res.status(500).json('Invalid request');
+        }
     }
-    matchMake(gameType, options) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let foundGameId = null;
-            if (this.userDefinedMatchMaker) {
-                foundGameId = this.userDefinedMatchMaker(this.availableGamesByType[gameType], options);
-            }
-            const userValidated = yield this.matchMake(gameType, options);
-            if (!(userValidated)) {
-                //   return res.status(400).json('Error requesting game.');
-            }
-            else {
-                //todo: implement my req/res socket lib to send request to channel to reserve seat for client
-                //let connected = await this.connectPlayer(connectorGateURI)
-                // if(connected)
-                // gets first element in connector since it's always sorted.
-                const connectorData = this.gamesByType[gameType].connectorsData[0];
-                this.addPlayerToConnector(connectorData.serverIndex);
-            }
-        });
+    async matchMake(gameType, options) {
+        if (!(this.userDefinedMatchMaker)) {
+            throw new Error('Please define a match making function using registerMathMaker');
+        }
+        let foundGameId = this.userDefinedMatchMaker(this.availableGamesByType[gameType], options);
+        if (!foundGameId) {
+            return false;
+        }
+        //todo: implement my req/res socket lib to send request to channel to reserve seat for client
+        //let connected = await this.connectPlayer(connectorGateURI)
+        // if(connected)
+        // gets first element in connector since it's always sorted.
+        const connectorData = this.gamesByType[gameType].connectorsData[0];
+        this.addPlayerToConnector(connectorData.serverIndex);
+        return connectorData.URL;
     }
     registerMatchMaker(handler) {
         this.userDefinedMatchMaker = handler;
@@ -143,7 +146,7 @@ class Gate {
         if (this.heartbeat) {
             this.stopConnectorHeartbeat();
         }
-        this.heartbeat = setInterval(() => __awaiter(this, void 0, void 0, function* () {
+        this.heartbeat = setInterval(async () => {
             const heartbeats = Object.keys(this.connectorsByServerIndex).map(key => {
                 return this.connectorsByServerIndex[key].heartbeat;
             });
@@ -159,7 +162,7 @@ class Gate {
                     }
                 }
             });
-        }), interval);
+        }, interval);
     }
     stopConnectorHeartbeat() {
         clearTimeout(this.heartbeat);

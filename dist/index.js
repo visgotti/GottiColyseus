@@ -8,3 +8,5 @@ var AreaServer_1 = require("./AreaServer");
 exports.AreaServer = AreaServer_1.AreaServer;
 var AreaRoom_1 = require("./AreaRoom");
 exports.AreaRoom = AreaRoom_1.AreaRoom;
+var MasterServer_1 = require("./MasterServer");
+exports.MasterServer = MasterServer_1.MasterServer;

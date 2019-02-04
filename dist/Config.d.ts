@@ -1,19 +1,23 @@
 interface AreaRoom {
     id: string;
-    roomConstructor: () => any;
+    constructorPath: string;
     options: any;
 }
 interface AreaServer {
-    serverId: string;
     areaRooms: Array<AreaRoom>;
 }
 interface GameConfig {
     connectorCount: number;
+    connectorConstructorPath: string;
     areaServers: Array<AreaServer>;
+    port?: number;
 }
-interface Config {
-    games: Array<GameConfig>;
+export interface Config {
+    games: {
+        [type: string]: GameConfig;
+    };
     connector_servers: Array<string>;
     area_servers: Array<string>;
+    gate_server: string;
 }
-export default Config;
+export {};

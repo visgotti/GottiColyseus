@@ -38,7 +38,7 @@ app.use(bodyParser.text());
 app.use(bodyParser.json({type: 'application/json'}));
 
 app.get('/gate', gate.gateKeep);
-app.post('/gate', gate.gameRequest);
+app.post('/gate', gate.gameRequested);
 
 setTimeout(() => {
     Promise.all([exampleConnector1.connectToAreas(), exampleConnector2.connectToAreas()])
