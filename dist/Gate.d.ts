@@ -18,7 +18,6 @@ export interface GateConfig {
 }
 export declare class Gate {
     urls: any[];
-    private userDefinedMatchMaker;
     private connectorsByServerIndex;
     private gamesByType;
     private gamesById;
@@ -26,7 +25,8 @@ export declare class Gate {
     private requester;
     private availableGamesByType;
     private heartbeat;
-    constructor();
+    constructor(gateURI: any);
+    addConnector(URL: any, serverIndex: any, gameType: any): void;
     initializeServer(config: GateConfig): void;
     /**
      * Handles the request from a player for a certain game type. needs work
@@ -38,9 +38,6 @@ export declare class Gate {
      */
     gameRequested(req: any, res: any): Promise<any>;
     private matchMake;
-    registerMatchMaker(handler: (gamesById: {
-        [id: string]: GameData;
-    }, options?: any) => boolean): void;
     /**
      * Returns lowest valued gameId in map.
      * @param gamesById - Dictionary of available games for a certain game type
@@ -51,7 +48,6 @@ export declare class Gate {
     private onGateKeepHandler;
     private validateGameRequest;
     private getLeastPopulatedConnector;
-    private registerConnectorSubs;
     /**
      * Adds a player to the connector's count and then resorts the pool
      * @param serverIndex - server index that the connector lives on.
@@ -69,4 +65,6 @@ export declare class Gate {
     private formatGamesData;
     private getClientCountOnConnector;
     private getGameIdOfConnector;
+    private createRequestsForConnector;
+    private reserveRoom;
 }

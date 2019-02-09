@@ -2,11 +2,19 @@ const msgpack = require('notepack.io');
 import { AreaServer, Connector } from '../src';
 import { Protocol } from '../src/Protocol';
 import { createDummyConnectorClient } from './mock';
+
+import AcceptsRequestsArea from './mocks/AreaRooms/AcceptRoom';
+import RejectsRequestsArea from './mocks/AreaRooms/DeclineRoom';
+import AcceptAuthConnector from './mocks/Connectors/AcceptJoin';
+import DeclineAuthConnector from './mocks/Connectors/DeclineJoin';
+
+
 import * as http from 'http';
 import * as sinon from 'sinon';
 import * as assert from 'assert';
 import * as mocha from 'mocha';
 import * as path from 'path';
+
 
 const connector_1_uri = 'tcp://127.0.0.1:4000';
 const connector_2_uri = 'tcp://127.0.0.1:4001';
@@ -16,7 +24,7 @@ const area_2_uri = 'tcp://127.0.0.1:5001';
 
 const gate_uri = 'tcp://127.0.0.1:7070';
 
-describe('Area and Connector Integration tests', () => {
+describe.only('Area and Connector Integration tests', () => {
 
     let areaServer1 = null;
     let areaServer2 = null;
@@ -38,22 +46,22 @@ describe('Area and Connector Integration tests', () => {
 
     before('constructs two connector servers and two area servers with 2 areas each and 2 clients.', (done) => {
         const acceptRoom1Options = {
-            constructorPath: '/test/AreaRooms/AcceptRoom',
+            areaConstructor: AcceptsRequestsArea,
             id: 'accept1',
         };
 
         const rejectRoom1Options = {
-            constructorPath: '/test/AreaRooms/DeclineRoom',
+            areaConstructor: RejectsRequestsArea,
             id: 'reject1',
         };
 
         const acceptRoom2Options = {
-            constructorPath: '/test/AreaRooms/AcceptRoom',
+            areaConstructor: AcceptsRequestsArea,
             id: 'accept2',
         };
 
         const rejectRoom2Options = {
-            constructorPath: '/test/AreaRooms/DeclineRoom',
+            areaConstructor: RejectsRequestsArea,
             id: 'reject2',
         };
 
@@ -88,7 +96,6 @@ describe('Area and Connector Integration tests', () => {
         assert.ok(rejectRoom2);
 
         mockConnector1Options = {
-            constructorPath: '/Connectors/AcceptJoin',
             server: 'http',
             port: 8080,
             serverIndex: 2,
@@ -99,7 +106,6 @@ describe('Area and Connector Integration tests', () => {
         };
 
         mockConnector2Options = {
-            constructorPath: '/Connectors/AcceptJoin',
             server: 'http',
             port: 8081,
             serverIndex: 3,
@@ -109,11 +115,8 @@ describe('Area and Connector Integration tests', () => {
             areaServerURIs: [area_1_uri, area_2_uri]
         };
 
-        const klass1 = require(path.join(__dirname, mockConnector1Options.constructorPath)).default;
-        const klass2 =  require(path.join(__dirname, mockConnector2Options.constructorPath)).default;
-
-        connector1 = new klass1(mockConnector1Options);
-        connector2 = new klass2(mockConnector2Options);
+        connector1 = new AcceptAuthConnector(mockConnector1Options);
+        connector2 = new DeclineAuthConnector(mockConnector2Options);
 
         assert.ok(connector1);
         assert.ok(connector2);
@@ -141,7 +144,9 @@ describe('Area and Connector Integration tests', () => {
             onAddClientListenHandlerReject1Spy = sinon.spy(rejectRoom1.areaChannel, 'onAddClientListenHandler');
             onAddedAreaListenAccept1Spy = sinon.spy(connector1, 'onAddedAreaListen');
 
-            connector1.emit('connection', client1, { auth: true, options: true });
+
+            (connector1._reserveSeat(client1.gottiId, { 'foo': 'bar' }));
+            connector1.emit('connection', client1, { gottiId: client1.gottiId });
             const message = [Protocol.REQUEST_LISTEN_AREA, 'accept1', { foo: 'bar' }];
             const encoded = msgpack.encode(message);
             // throws because client didnt set a write channel
@@ -149,16 +154,16 @@ describe('Area and Connector Integration tests', () => {
 
             const message2 = [Protocol.REQUEST_LISTEN_AREA, 'reject1', { foo: 'bar' }];
             const encoded2 = msgpack.encode(message2);
-            client1.emit('message', encoded2);
 
+            client1.emit('message', encoded2);
             done();
         });
 
         it('accepts listen when requested', (done) => {
             sinon.assert.calledOnce(onAddClientListenHandlerAccept1Spy);
             assert.ok(onAddClientListenHandlerAccept1Spy.returned({ foo: 'bar' }));
-            assert.ok(client1.id in acceptRoom1.clientsById);
-            assert.deepStrictEqual(acceptRoom1.clientsById[client1.id].options, { foo: 'bar'});
+            assert.ok(client1.gottiId in acceptRoom1.clientsById);
+            assert.deepStrictEqual(acceptRoom1.clientsById[client1.gottiId].options, { foo: 'bar'});
 
             setTimeout(() => {
                 assert.ok(client1.channelClient.isLinkedToChannel('accept1'));
@@ -166,7 +171,6 @@ describe('Area and Connector Integration tests', () => {
                 onAddClientListenHandlerAccept1Spy.restore();
                 onAddClientListenHandlerReject1Spy.restore();
                 onAddedAreaListenAccept1Spy.restore();
-
                 done();
             }, 20);
         });
@@ -174,7 +178,7 @@ describe('Area and Connector Integration tests', () => {
         it('rejects listen when requested', (done) => {
             sinon.assert.calledOnce(onAddClientListenHandlerReject1Spy);
             assert.ok(onAddClientListenHandlerReject1Spy.returned(false));
-            assert.ok(!(client1.id in rejectRoom1.clientsById));
+            assert.ok(!(client1.gottiId in rejectRoom1.clientsById));
             done();
         });
 
@@ -195,7 +199,7 @@ describe('Area and Connector Integration tests', () => {
                 sinon.assert.calledOnce(removeClientListenerSpy);
                 assert.ok(!(client1.channelClient.isLinkedToChannel('accept1')));
                 sinon.assert.calledOnce(onRemovedAreaListenAccept1Spy);
-                assert.ok(!(client1.id in acceptRoom1.clientsById));
+                assert.ok(!(client1.gottiId in acceptRoom1.clientsById));
 
 
                 onAddClientListenHandlerAccept1Spy.restore();
@@ -224,15 +228,15 @@ describe('Area and Connector Integration tests', () => {
 
             setTimeout(() => {
                 // confirm client listened to acceptRoom
-                assert.ok(client1.id in acceptRoom1.clientsById);
-                assert.deepStrictEqual(acceptRoom1.clientsById[client1.id].options, { foo: 'bar'});
+                assert.ok(client1.gottiId in acceptRoom1.clientsById);
+                assert.deepStrictEqual(acceptRoom1.clientsById[client1.gottiId].options, { foo: 'bar'});
 
                 // sends the notification to connector to add as write
-                acceptRoom1.setClientWrite(client1.id, acceptRoom1.areaId, { "foo": "baz" });
+                acceptRoom1.setClientWrite(client1.gottiId, acceptRoom1.areaId, { "foo": "baz" });
 
                 setTimeout(() => {
                     // options should have changed
-                    assert.deepStrictEqual(acceptRoom1.clientsById[client1.id].options, { foo: 'baz'});
+                    assert.deepStrictEqual(acceptRoom1.clientsById[client1.gottiId].options, { foo: 'baz'});
 
                     sinon.assert.calledOnce(setClientWriteSpy);
 

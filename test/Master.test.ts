@@ -6,7 +6,7 @@ import * as mocha from 'mocha';
 import { MasterServer } from '../src';
 import config from './mocks/config';
 
-describe.only('Master Server tests', () => {
+describe('Master Server tests', () => {
     let masterServer;
 
     afterEach('', (done) => {

@@ -1,6 +1,6 @@
 interface AreaRoom {
     id: string,
-    constructorPath: string,
+    areaConstructor: any,
     options: any, // sent to client in an { [areaId]: options } map when join
 }
 
@@ -10,9 +10,8 @@ interface AreaServer {
 
 interface GameConfig {
     connectorCount: number,  //how many connector servers you want to use.
-    connectorConstructorPath: string,
     areaServers: Array<AreaServer>,
-    port?: number,
+    port?: number, // port the connector server listens for web requests from
 }
 
 export interface Config {

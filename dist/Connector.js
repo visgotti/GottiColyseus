@@ -13,12 +13,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const http = require("http");
 const Util_1 = require("./Util");
-//import * as parseURL from 'url-parse';
+const parseURL = require("url-parse");
 const WebSocket = require("ws");
 const dist_1 = require("gotti-reqres/dist");
 const dist_2 = require("gotti-channels/dist");
 const Protocol_1 = require("./Protocol");
-const msgpack = require('notepack.io');
 const nanoid = require('nanoid');
 const events_1 = require("events");
 //import { debugAndPrintError, debugPatch, debugPatchData } from '../../colyseus/lib/Debug';
@@ -35,19 +34,23 @@ class Connector extends events_1.EventEmitter {
         this.masterChannel = null;
         this.clients = [];
         this.clientsById = {};
+        this.reservedSeats = {};
         this.onConnection = (client, req) => {
-            const upgradeReq = req || client.upgradeReq;
             client.pingCount = 0;
-            if (!(client.auth) || !(client.auth.id) || !(this.reservedSeats[client.auth.id])) {
-                // send(client, [Protocol.JOIN_CONNECTOR_ERROR])
+            const upgradeReq = req || client.upgradeReq;
+            const url = parseURL(upgradeReq.url);
+            const query = Util_1.parseQueryString(url.query);
+            req.gottiId = query.gottiId;
+            if (!(client) || !(req.gottiId) || !(this.reservedSeats[req.gottiId])) {
+                Protocol_1.send(client, [11 /* JOIN_CONNECTOR_ERROR */]);
             }
             else {
-                const { auth, options } = client;
-                this._onJoin(client, auth, options);
+                client.gottiId = req.gottiId;
+                this._onJoin(client, this.reservedSeats[req.gottiId].auth);
             }
             // prevent server crashes if a single client had unexpected error
             client.on('error', (err) => console.error(err.message + '\n' + err.stack));
-            //send(client, [Protocol.USER_ID, client.id])
+            //send(client, [Protocol.USER_ID, client.gottiId])
         };
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
@@ -66,9 +69,11 @@ class Connector extends events_1.EventEmitter {
             throw 'please use http or net as server option';
         }
         this.responder = new dist_1.Messenger({
+            response: true,
             id: `${this.serverIndex}_responder`,
             brokerURI: options.gateURI,
         });
+        this.registerGateResponders();
         //this.setPatchRate(this.patchRate);
     }
     async connectToAreas() {
@@ -81,10 +86,11 @@ class Connector extends events_1.EventEmitter {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
                     this.areaOptions = connection.backChannelOptions;
+                    console.log('area options became', this.areaOptions);
                     this.registerAreaMessages();
                     this.server = new WebSocket.Server(this.options);
-                    this.httpServer.on('connection', this.onConnection);
-                    this.on('connection', this.onConnection); // used for testing
+                    this.server.on('connection', this.onConnection.bind(this));
+                    this.on('connection', this.onConnection.bind(this)); // used for testing
                     console.log(`Connector ${this.serverIndex} succesfully listening for client connections on port ${this.port}`);
                     return resolve(true);
                 });
@@ -96,7 +102,7 @@ class Connector extends events_1.EventEmitter {
      * @param auth - authentication data sent from Gate server.
      * @returns {number}
      */
-    requestJoin(clientId, auth) {
+    requestJoin(auth) {
         return 1;
     }
     send(client, data) {
@@ -303,7 +309,7 @@ class Connector extends events_1.EventEmitter {
         const frontChannel = this.masterChannel.frontChannels[areaId];
         if (!(frontChannel))
             return false;
-        frontChannel.send([24 /* REQUEST_REMOVE_LISTEN_AREA */, options], areaId, client.id);
+        frontChannel.send([24 /* REQUEST_REMOVE_LISTEN_AREA */, options], areaId, client.gottiId);
     }
     async _requestAreaWrite(client, newAreaId, options) {
         const processorChannelId = client.channelClient.processorChannel;
@@ -311,22 +317,30 @@ class Connector extends events_1.EventEmitter {
             throw 'Client needs a processor channel before making area write requests.';
         // const changed = await this.changeAreaWrite(client, newAreaId, options);
         const frontChannel = this.masterChannel.frontChannels[newAreaId];
-        frontChannel.send([20 /* REQUEST_WRITE_AREA */, newAreaId, options], client.channelClient.processorChannel, client.id);
+        frontChannel.send([20 /* REQUEST_WRITE_AREA */, newAreaId, options], client.channelClient.processorChannel, client.gottiId);
     }
-    _onJoin(client, auth, options) {
+    _onJoin(client, auth) {
         // clear the timeout and remove the reserved seat since player joined
-        clearInterval(this.reservedSeats[auth.id].timeout);
-        delete this.reservedSeats[auth.id];
+        clearTimeout(this.reservedSeats[client.gottiId].timeout);
+        delete this.reservedSeats[client.gottiId];
         // add a channelClient to client
-        client.channelClient = new dist_2.Client(client.sessionId || client.id, this.masterChannel);
+        client.channelClient = new dist_2.Client(client.gottiId, this.masterChannel);
+        // register channel/area message handlers
         this.registerClientAreaMessageHandling(client);
         this.clients.push(client);
-        this.clientsById[client.id] = client;
-        // confirm room id that matches the room name requested to join
-        //send(client, [ Protocol.JOIN_CONNECTOR, client.sessionId, client.id, this.gameId, this.areaOptions ]);
+        this.clientsById[client.gottiId] = client;
+        console.log('onJoin was', this.onJoin);
+        console.log('this was', this);
+        let joinOptions = null;
+        if (this.onJoin) {
+            console.log('onJoin was', this.onJoin);
+            joinOptions = this.onJoin(client, auth);
+        }
+        console.log('sending can join with area options', this.areaOptions);
+        console.log('and joinOptions', joinOptions);
+        Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, this.areaOptions, joinOptions]);
         client.on('message', this._onWebClientMessage.bind(this, client));
         client.once('close', this._onLeave.bind(this, client));
-        return this.onJoin && this.onJoin(client, options, auth);
     }
     async _onLeave(client, code) {
         // call abstract 'onLeave' method only if the client has been successfully accepted.
@@ -346,7 +360,12 @@ class Connector extends events_1.EventEmitter {
      * @private
      */
     _reserveSeat(clientId, auth) {
-        this.reservedSeats[clientId] = auth;
+        this.reservedSeats[clientId] = {
+            auth,
+            timeout: setTimeout(() => {
+                delete this.reservedSeats[clientId];
+            }, 10000) // reserve seat for 10 seconds
+        };
     }
     /**
      * Handles request from gate server, whatever this returns gets sent back to the gate server
@@ -355,11 +374,12 @@ class Connector extends events_1.EventEmitter {
      * @private
      */
     _requestJoin(data) {
-        const clientId = data[0];
-        const auth = data[1];
-        if (this.requestJoin(clientId, auth)) {
-            this._reserveSeat(clientId, auth);
-            return true;
+        const auth = data[0];
+        if (this.requestJoin(auth)) {
+            const gottiId = Util_1.generateId();
+            this._reserveSeat(gottiId, auth);
+            // todo send host n port
+            return { URL: this.port, gottiId };
         }
         else {
             return false;
@@ -367,10 +387,10 @@ class Connector extends events_1.EventEmitter {
     }
     //TODO: maybe need to ping gate before?
     registerGateResponders() {
-        this.responder.createResponse("2" /* HEARTBEAT */, () => {
+        this.responder.createResponse("2" /* HEARTBEAT */ + '-' + this.serverIndex, () => {
             return [this.serverIndex, this.clients.length];
         });
-        this.responder.createResponse("1" /* RESERVE_PLAYER_SEAT */, this._requestJoin.bind(this));
+        this.responder.createResponse("1" /* RESERVE_PLAYER_SEAT */ + '-' + this.serverIndex, this._requestJoin.bind(this));
     }
 }
 exports.Connector = Connector;

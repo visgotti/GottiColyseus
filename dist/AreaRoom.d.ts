@@ -1,7 +1,6 @@
 /// <reference types="node" />
 import { BackChannel, BackMaster } from 'gotti-channels/dist';
 import { EventEmitter } from 'events';
-import { PublicAreaOptions } from './AreaServer';
 import { AreaClient as Client } from './AreaClient';
 export interface BroadcastOptions {
     except: Client;
@@ -22,7 +21,7 @@ export declare type AreaToAreaSystemMessage = {
 export declare abstract class AreaRoom extends EventEmitter {
     roomId: string;
     roomName: string;
-    publicOptions: PublicAreaOptions;
+    publicOptions: any;
     readonly areaId: string | number;
     patchRate: number;
     areaChannel: BackChannel;
@@ -30,7 +29,7 @@ export declare abstract class AreaRoom extends EventEmitter {
     metadata: any;
     clientsById: any;
     private _patchInterval;
-    constructor(areaId: any, publicOptions?: PublicAreaOptions);
+    constructor(areaId: any, publicOptions?: any);
     initializeChannels(masterChannel: any, areaChannel: any): void;
     abstract onMessage(clientId: string, message: any): void;
     onInit?(options: any): void;

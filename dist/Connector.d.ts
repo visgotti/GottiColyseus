@@ -10,7 +10,6 @@
  *  https://github.com/visgotti
  ***************************************************************************************/
 /// <reference types="node" />
-import * as WebSocket from 'ws';
 import { ServerOptions as IServerOptions } from 'ws';
 import { FrontMaster } from 'gotti-channels/dist';
 import { EventEmitter } from 'events';
@@ -18,7 +17,6 @@ import { ConnectorClient as Client } from './ConnectorClient';
 export declare type SimulationCallback = (deltaTime?: number) => void;
 export declare type ConnectorOptions = IServerOptions & {
     pingTimeout?: number;
-    verifyClient?: WebSocket.VerifyClientCallbackAsync;
     gracefullyShutdown?: boolean;
     server: string;
     port?: number;
@@ -65,14 +63,14 @@ export declare abstract class Connector extends EventEmitter {
     private responder;
     private reservedSeats;
     constructor(options: ConnectorOptions);
-    protected onConnection: (client: any, req?: any) => void;
+    protected onConnection: (client: any, req: any) => void;
     connectToAreas(): Promise<boolean>;
     abstract onMessage(client: Client, message: any): void;
     onAddedAreaListen?(client: any, areaId: string, options?: any): void | Promise<any>;
     onRemovedAreaListen?(client: any, areaId: string, options?: any): void | Promise<any>;
     onChangedAreaWrite?(client: any, newAreaId: string, oldAreaId?: string): void | Promise<any>;
     onInit?(options: any): void;
-    onJoin?(client: Client, any: any, auth: any, options?: any): void | Promise<any>;
+    onJoin?(client: Client, auth: any): any | Promise<any>;
     onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     onDispose?(): void | Promise<any>;
     onAuth?(options: any): boolean;
@@ -81,7 +79,7 @@ export declare abstract class Connector extends EventEmitter {
      * @param auth - authentication data sent from Gate server.
      * @returns {number}
      */
-    requestJoin(clientId: string, auth: any): number | boolean;
+    requestJoin(auth: any): number | boolean;
     send(client: Client, data: any): void;
     disconnect(closeHttp?: boolean): Promise<boolean>;
     protected broadcast(data: any, options?: BroadcastOptions): boolean;

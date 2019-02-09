@@ -13,9 +13,10 @@
 import * as net from 'net';
 import * as http from 'http';
 
-import { merge, spliceOne } from './Util';
+import { merge, spliceOne, generateId, parseQueryString } from './Util';
 
-//import * as parseURL from 'url-parse';
+import * as parseURL from 'url-parse';
+
 import * as WebSocket from 'ws';
 import { ServerOptions as IServerOptions } from 'ws';
 
@@ -26,7 +27,6 @@ import { decode, Protocol, GateProtocol, send, WS_CLOSE_CONSENTED  } from './Pro
 
 import * as fossilDelta from 'fossil-delta';
 
-const msgpack = require('notepack.io');
 const nanoid = require('nanoid');
 
 import { EventEmitter } from 'events';
@@ -44,7 +44,6 @@ export type SimulationCallback = (deltaTime?: number) => void;
 
 export type ConnectorOptions = IServerOptions & {
     pingTimeout?: number,
-    verifyClient?: WebSocket.VerifyClientCallbackAsync
     gracefullyShutdown?: boolean,
     server: string,
     port?: number,
@@ -95,7 +94,7 @@ export abstract class Connector extends EventEmitter {
     private server: any;
     private gateURI: string;
     private responder: Responder;
-    private reservedSeats: {[clientId: string]: any};
+    private reservedSeats: {[clientId: string]: any} = {};
 
     constructor(options: ConnectorOptions) {
         super();
@@ -117,28 +116,33 @@ export abstract class Connector extends EventEmitter {
         }
 
         this.responder = new Responder({
+            response: true,
             id: `${this.serverIndex}_responder`,
             brokerURI: options.gateURI,
         });
 
+        this.registerGateResponders();
         //this.setPatchRate(this.patchRate);
     }
 
-    protected onConnection = (client: Client, req?: http.IncomingMessage & any) => {
-        const upgradeReq = req || client.upgradeReq;
+    protected onConnection = (client: Client, req: http.IncomingMessage & any) => {
         client.pingCount = 0;
 
+        const upgradeReq = req || client.upgradeReq;
+        const url = parseURL(upgradeReq.url);
+        const query = parseQueryString(url.query);
+        req.gottiId = query.gottiId;
 
-        if(!(client.auth) || !(client.auth.id) || !(this.reservedSeats[client.auth.id]) ) {
-            // send(client, [Protocol.JOIN_CONNECTOR_ERROR])
+        if(!(client) || !(req.gottiId) || !(this.reservedSeats[req.gottiId]) ) {
+            send(client, [Protocol.JOIN_CONNECTOR_ERROR])
         } else {
-            const { auth, options } = client;
-            this._onJoin(client, auth, options);
+            client.gottiId = req.gottiId;
+            this._onJoin(client, this.reservedSeats[req.gottiId].auth);
         }
 
         // prevent server crashes if a single client had unexpected error
         client.on('error', (err) => console.error(err.message + '\n' + err.stack));
-        //send(client, [Protocol.USER_ID, client.id])
+        //send(client, [Protocol.USER_ID, client.gottiId])
     };
 
     public async connectToAreas() : Promise<boolean> {
@@ -153,11 +157,12 @@ export abstract class Connector extends EventEmitter {
                 this.masterChannel.connect().then((connection) => {
 
                     this.areaOptions = connection.backChannelOptions;
+                    console.log('area options became', this.areaOptions);
                     this.registerAreaMessages();
 
                     this.server = new WebSocket.Server(this.options);
-                    this.httpServer.on('connection', this.onConnection);
-                    this.on('connection', this.onConnection); // used for testing
+                    this.server.on('connection', this.onConnection.bind(this));
+                    this.on('connection', this.onConnection.bind(this)); // used for testing
 
                     console.log(`Connector ${this.serverIndex} succesfully listening for client connections on port ${this.port}`)
 
@@ -179,7 +184,7 @@ export abstract class Connector extends EventEmitter {
     public onInit?(options: any): void;
 
     // auth is the data that was sent from the gate channel and options is any data passed from client on connection
-    public onJoin?(client: Client, any, auth: any,  options?): void | Promise<any>;
+    public onJoin?(client: Client, auth: any): any | Promise<any>;
     public onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     public onDispose?(): void | Promise<any>;
     public onAuth?(options: any): boolean;
@@ -189,7 +194,7 @@ export abstract class Connector extends EventEmitter {
      * @param auth - authentication data sent from Gate server.
      * @returns {number}
      */
-    public requestJoin(clientId: string, auth: any): number | boolean {
+    public requestJoin(auth: any): number | boolean {
         return 1;
     }
 
@@ -418,7 +423,7 @@ export abstract class Connector extends EventEmitter {
     private _requestRemoveAreaListen(client: Client, areaId: string, options?: any) {
         const frontChannel = this.masterChannel.frontChannels[areaId];
         if(!(frontChannel)) return false;
-        frontChannel.send([Protocol.REQUEST_REMOVE_LISTEN_AREA, options], areaId, client.id);
+        frontChannel.send([Protocol.REQUEST_REMOVE_LISTEN_AREA, options], areaId, client.gottiId);
     }
 
     private async _requestAreaWrite(client: Client, newAreaId: string, options?: any) {
@@ -426,29 +431,36 @@ export abstract class Connector extends EventEmitter {
         if(!(processorChannelId)) throw 'Client needs a processor channel before making area write requests.';
         // const changed = await this.changeAreaWrite(client, newAreaId, options);
         const frontChannel = this.masterChannel.frontChannels[newAreaId];
-        frontChannel.send([Protocol.REQUEST_WRITE_AREA, newAreaId, options], client.channelClient.processorChannel, client.id);
+        frontChannel.send([Protocol.REQUEST_WRITE_AREA, newAreaId, options], client.channelClient.processorChannel, client.gottiId);
     }
 
-
-    private _onJoin(client: Client, auth: any, options?: any,) {
-
+    private _onJoin(client, auth) {
         // clear the timeout and remove the reserved seat since player joined
-        clearInterval(this.reservedSeats[auth.id].timeout);
-        delete this.reservedSeats[auth.id];
+        clearTimeout(this.reservedSeats[client.gottiId].timeout);
+        delete this.reservedSeats[client.gottiId];
 
         // add a channelClient to client
-        client.channelClient = new ChannelClient(client.sessionId || client.id, this.masterChannel);
+        client.channelClient = new ChannelClient(client.gottiId, this.masterChannel);
+        // register channel/area message handlers
         this.registerClientAreaMessageHandling(client);
         this.clients.push( client );
-        this.clientsById[client.id] = client;
+        this.clientsById[client.gottiId] = client;
+        console.log('onJoin was', this.onJoin);
+        console.log('this was', this);
+        let joinOptions = null;
+        if(this.onJoin) {
+            console.log('onJoin was', this.onJoin);
+            joinOptions = this.onJoin(client, auth)
+        }
 
-        // confirm room id that matches the room name requested to join
-        //send(client, [ Protocol.JOIN_CONNECTOR, client.sessionId, client.id, this.gameId, this.areaOptions ]);
+        console.log('sending can join with area options', this.areaOptions);
+
+        console.log('and joinOptions', joinOptions);
+
+        send(client, [ Protocol.JOIN_CONNECTOR, this.areaOptions, joinOptions ]);
 
         client.on('message', this._onWebClientMessage.bind(this, client));
         client.once('close', this._onLeave.bind(this, client));
-
-        return this.onJoin && this.onJoin(client, options, auth);
     }
 
     private async _onLeave(client: Client, code?: number): Promise<any> {
@@ -471,7 +483,12 @@ export abstract class Connector extends EventEmitter {
      * @private
      */
     private _reserveSeat(clientId, auth) {
-        this.reservedSeats[clientId] = auth;
+        this.reservedSeats[clientId] = {
+            auth,
+            timeout: setTimeout(() => {
+                delete this.reservedSeats[clientId];
+            }, 10000) // reserve seat for 10 seconds
+        }
     }
 
     /**
@@ -481,12 +498,13 @@ export abstract class Connector extends EventEmitter {
      * @private
      */
     private _requestJoin(data) {
-        const clientId = data[0];
-        const auth = data[1];
+        const auth = data[0];
 
-        if(this.requestJoin(clientId, auth)) {
-            this._reserveSeat(clientId, auth);
-            return true;
+        if(this.requestJoin(auth)) {
+            const gottiId = generateId();
+            this._reserveSeat(gottiId, auth);
+            // todo send host n port
+            return { URL: this.port, gottiId } ;
         } else {
             return false;
         }
@@ -494,9 +512,11 @@ export abstract class Connector extends EventEmitter {
 
     //TODO: maybe need to ping gate before?
     private registerGateResponders() {
-        this.responder.createResponse(GateProtocol.HEARTBEAT, () => {
+        this.responder.createResponse(GateProtocol.HEARTBEAT + '-' +  this.serverIndex, () => {
             return [this.serverIndex, this.clients.length];
         });
-        this.responder.createResponse(GateProtocol.RESERVE_PLAYER_SEAT, this._requestJoin.bind(this))
+        this.responder.createResponse(GateProtocol.RESERVE_PLAYER_SEAT + '-' +  this.serverIndex, this._requestJoin.bind(this))
     }
+
+
 }

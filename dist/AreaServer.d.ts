@@ -1,14 +1,9 @@
 import { AreaRoom } from './AreaRoom';
 import { BackMaster } from 'gotti-channels/dist';
-export declare type PublicAreaOptions = {
-    id: string;
-    options: any;
-};
 export declare type AreaOption = {
-    constructorPath: string;
-    constructorExportName?: string;
+    areaConstructor: any;
     id: string;
-    options?: PublicAreaOptions;
+    options?: any;
 };
 export declare type AreaServerOptions = {
     serverIndex: number;

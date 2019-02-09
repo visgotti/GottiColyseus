@@ -1,6 +1,6 @@
 interface AreaRoom {
     id: string;
-    constructorPath: string;
+    areaConstructor: any;
     options: any;
 }
 interface AreaServer {
@@ -8,7 +8,6 @@ interface AreaServer {
 }
 interface GameConfig {
     connectorCount: number;
-    connectorConstructorPath: string;
     areaServers: Array<AreaServer>;
     port?: number;
 }

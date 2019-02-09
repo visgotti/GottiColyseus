@@ -5,7 +5,6 @@ export default class MockArea2 extends AreaRoom {
         super(id);
     }
     requestWrite(clientId, areaId, options?) {
-        console.log('options were', options);
         const responseOptions = (!options) ? true : options;
         return responseOptions;
     }

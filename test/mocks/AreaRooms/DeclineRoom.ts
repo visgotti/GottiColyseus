@@ -1,4 +1,4 @@
-import { AreaRoom } from '../../src';
+import { AreaRoom } from '../../../src';
 
 export default class RejectsRequestsArea extends AreaRoom {
     constructor(id) {

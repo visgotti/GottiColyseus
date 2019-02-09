@@ -16,6 +16,8 @@ class AreaRoom extends events_1.EventEmitter {
     }
     initializeChannels(masterChannel, areaChannel) {
         if (this.areaId !== areaChannel.channelId) {
+            console.log('the area channel was', areaChannel.channelId);
+            console.log('the area id was', this.areaId);
             throw 'Area Id and area channel id must be the same.';
         }
         this.areaChannel = areaChannel;

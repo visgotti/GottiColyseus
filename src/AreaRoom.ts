@@ -3,9 +3,6 @@ import { Protocol } from './Protocol';
 
 import { EventEmitter } from 'events';
 
-
-import { PublicAreaOptions } from './AreaServer';
-
 import { AreaClient as Client } from './AreaClient';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
@@ -33,7 +30,7 @@ export abstract class AreaRoom extends EventEmitter {
     public roomId: string;
     public roomName: string;
 
-    public publicOptions: PublicAreaOptions;
+    public publicOptions: any;
 
     readonly areaId: string | number;
 
@@ -48,7 +45,7 @@ export abstract class AreaRoom extends EventEmitter {
 
     private _patchInterval: NodeJS.Timer;
 
-    constructor(areaId, publicOptions?: PublicAreaOptions) {
+    constructor(areaId, publicOptions?: any) {
         super();
         this.publicOptions = publicOptions;
         this.areaId = areaId;
@@ -59,6 +56,8 @@ export abstract class AreaRoom extends EventEmitter {
 
     public initializeChannels(masterChannel, areaChannel) {
         if(this.areaId !== areaChannel.channelId) {
+            console.log('the area channel was', areaChannel.channelId);
+            console.log('the area id was', this.areaId);
             throw 'Area Id and area channel id must be the same.'
         }
         this.areaChannel = areaChannel;

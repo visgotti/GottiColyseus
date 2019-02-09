@@ -1,22 +1,24 @@
 import { Config } from '../../src';
+import MockArea1 from '../mocks/AreaRooms/mock1';
+import MockArea2 from '../mocks/AreaRooms/mock2';
+
 export default {
     games: {
         'test_game': {
             connectorCount: 2,
-            connectorConstructorPath: '../test/mocks/Connectors/mock.ts',
             port: 8081,
             areaServers: [{
                 areaRooms: [
                     {
                         id: 'test_area_1',
-                        constructorPath: '../test/mocks/AreaRooms/mock1.ts',
+                        areaConstructor: MockArea1,
                         options: {
                             'foo': 'bar1',
                         }
                     },
                     {
                         id: 'test_area_2',
-                        constructorPath: '../test/mocks/AreaRooms/mock1.ts',
+                        areaConstructor: MockArea1,
                         options: {
                             'foo': 'bar2',
                         }
@@ -27,14 +29,14 @@ export default {
                     areaRooms: [
                         {
                             id: 'test_area_3',
-                            constructorPath: '../test/mocks/AreaRooms/mock2.ts',
+                            areaConstructor: MockArea2,
                             options: {
                                 'foo': 'bar3',
                             }
                         },
                         {
                             id: 'test_area_4',
-                            constructorPath: '../test/mocks/AreaRooms/mock2.ts',
+                            areaConstructor: MockArea2,
                             options: {
                                 'foo': 'bar4',
                             }

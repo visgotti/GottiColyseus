@@ -17,15 +17,15 @@ export class DummyArea extends Area {
 
 export class Client extends EventEmitter {
 
-    public id: string;
+    public gottiId: string;
     public messages: Array<any> = [];
     public readyState: number = WebSocket.OPEN;
     public channelClient: ChannelClient;
 
     constructor (connector: Connector) {
         super();
-        this.id = generateId();
-        this.channelClient = new ChannelClient(this.id, connector.masterChannel);
+        this.gottiId = generateId();
+        this.channelClient = new ChannelClient(this.gottiId, connector.masterChannel);
         this.once('close', () => {
             this.readyState = WebSocket.CLOSED
         });
