@@ -11,7 +11,7 @@
   "author": "visgotti",
   "license": "ISC",
   "dependencies": {
-    "gotti-channels": "^0.2.44",
+    "gotti-channels": "^0.2.5",
     "gotti-reqres": "^0.1.1",
     "nanoid": "^2.0.1",
     "notepack.io": "^2.2.0",

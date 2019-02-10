@@ -7,7 +7,6 @@ const options = JSON.parse(process.argv[3]);
 let areaServer = null;
 
 if(action === 'start') {
-    console.log('got options', options);
     areaServer = new AreaServer(options);
     process.send('started', true);
 } else if(action === 'stop') {

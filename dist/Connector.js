@@ -217,8 +217,13 @@ class Connector extends events_1.EventEmitter {
             //    debugAndPrintError(`${this.roomName} (${this.roomId}), couldn't decode message: ${message}`);
             return;
         }
+        const queueAreaMessage = client.channelClient.sendLocal.bind(client.channelClient);
+        const immediateAreaMessage = client.channelClient.sendLocalImmediate.bind(client.channelClient);
         if (message[0] === 28 /* SYSTEM_MESSAGE */) {
-            client.channelClient.sendLocal(message[1]);
+            client.channelClient.sendLocal(message);
+        }
+        else if (message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
+            client.channelClient.sendLocalImmediate(message);
         }
         else if (message[0] === 21 /* REQUEST_LISTEN_AREA */) {
             this._requestAreaListen(client, message[1], message[2]);

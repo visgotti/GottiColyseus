@@ -24,15 +24,21 @@ export declare abstract class AreaRoom extends EventEmitter {
     publicOptions: any;
     readonly areaId: string | number;
     patchRate: number;
+    gameLoopRate: number;
     areaChannel: BackChannel;
     masterChannel: BackMaster;
     metadata: any;
     clientsById: any;
     private _patchInterval;
-    constructor(areaId: any, publicOptions?: any);
+    state: any;
+    private gottiProcess;
+    constructor(gottiProcess: any, areaId: any, publicOptions?: any);
     initializeChannels(masterChannel: any, areaChannel: any): void;
+    private _onInit;
+    protected stopGame(): void;
+    protected startGame(): void;
     abstract onMessage(clientId: string, message: any): void;
-    onInit?(options: any): void;
+    onInit?(options?: any): void;
     onWrite?(clientId: string, options?: any): void;
     requestWrite(clientId: any, areaId: any, options?: any): any;
     onRemoveWrite?(clientId: string, options?: any): void;
@@ -40,7 +46,9 @@ export declare abstract class AreaRoom extends EventEmitter {
     onRemoveListen?(clientId: string, options: any): void;
     requestListen(clientId: any, options?: any): any;
     requestRemoveListen(clientId: any, options?: any): any;
-    setState(newState: any): void;
+    protected addMessage(message: SystemMessage): void;
+    protected addImmediateMessage(message: SystemMessage, isRemote: boolean): void;
+    protected setState(state: any): void;
     /**
      * sends system message to all clients in the game.
      * @param message

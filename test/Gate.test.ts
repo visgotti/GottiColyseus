@@ -60,7 +60,7 @@ describe('Gate', () => {
     let gate;
 
     before('Creates Gate instance', (done) => {
-        gate = new Gate(gateConfig);
+        gate = new Gate(gateURI);
         done();
     });
 

@@ -318,8 +318,13 @@ export abstract class Connector extends EventEmitter {
             return;
         }
 
+        const queueAreaMessage = client.channelClient.sendLocal.bind(client.channelClient);
+        const immediateAreaMessage = client.channelClient.sendLocalImmediate.bind(client.channelClient);
+
         if (message[0] === Protocol.SYSTEM_MESSAGE) {
-            client.channelClient.sendLocal(message[1]);
+            client.channelClient.sendLocal(message);
+        } else if(message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
+            client.channelClient.sendLocalImmediate(message);
         } else if (message[0] === Protocol.REQUEST_LISTEN_AREA) {
             this._requestAreaListen(client, message[1], message[2]);
         } else if (message[0] === Protocol.REQUEST_REMOVE_LISTEN_AREA) {

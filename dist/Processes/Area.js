@@ -6,7 +6,6 @@ const action = process.argv[2];
 const options = JSON.parse(process.argv[3]);
 let areaServer = null;
 if (action === 'start') {
-    console.log('got options', options);
     areaServer = new __1.AreaServer(options);
     process.send('started', true);
 }

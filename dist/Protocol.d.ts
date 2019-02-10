@@ -15,6 +15,7 @@ export declare const enum Protocol {
     AREA_DATA = 26,
     AREA_STATE_UPDATE = 27,
     SYSTEM_MESSAGE = 28,
+    IMMEDIATE_SYSTEM_MESSAGE = 29,
     GLOBAL_DATA = 30,
     GAME_STARTING = 31,
     GAME_ENDING = 32,

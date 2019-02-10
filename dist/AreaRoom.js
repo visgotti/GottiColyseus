@@ -3,11 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = require("events");
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
 class AreaRoom extends events_1.EventEmitter {
-    constructor(areaId, publicOptions) {
+    constructor(gottiProcess, areaId, publicOptions) {
         super();
         this.patchRate = DEFAULT_PATCH_RATE;
+        this.gameLoopRate = DEFAULT_PATCH_RATE;
         this.metadata = null;
         this.clientsById = {};
+        this.gottiProcess = null;
+        this.gottiProcess = gottiProcess;
         this.publicOptions = publicOptions;
         this.areaId = areaId;
         this.masterChannel = null;
@@ -23,6 +26,26 @@ class AreaRoom extends events_1.EventEmitter {
         this.areaChannel = areaChannel;
         this.masterChannel = masterChannel;
         this.registerBackChannelMessages();
+        this.onInit && this.onInit();
+    }
+    _onInit(options) { }
+    stopGame() {
+        if (this.gottiProcess) {
+            this.gottiProcess.stopAllSystems();
+            this.gottiProcess.stopLoop();
+        }
+        else {
+            throw new Error('No running gottiProcess');
+        }
+    }
+    startGame() {
+        if (this.gottiProcess) {
+            this.gottiProcess.startAllSystems();
+            this.gottiProcess.startLoop(this.gameLoopRate);
+        }
+        else {
+            throw new Error('Process is invalid');
+        }
     }
     requestWrite(clientId, areaId, options) {
         return true;
@@ -33,8 +56,24 @@ class AreaRoom extends events_1.EventEmitter {
     requestRemoveListen(clientId, options) {
         return true;
     }
-    setState(newState) {
-        this.areaChannel.setState(newState);
+    // dispatches local message to server systems from room
+    addMessage(message) {
+        this.gottiProcess.messageQueue.add(message);
+    }
+    addImmediateMessage(message, isRemote) {
+        this.gottiProcess.messageQueue.instantDispatch(message);
+    }
+    setState(state) {
+        if (!this.areaChannel) {
+            throw 'Please make sure the area channel has a channel attached before setting state.';
+        }
+        if (!(this.gottiProcess)) {
+            throw 'Make sure the process was created before setting state';
+        }
+        this.areaChannel.setState(state);
+        this.state = this.areaChannel.state;
+        // adds state to all system globals property.
+        this.gottiProcess.addGlobal(state);
     }
     /**
      * sends system message to all clients in the game.
@@ -139,12 +178,18 @@ class AreaRoom extends events_1.EventEmitter {
                 //  this.onMessage(message[1]);
             }
         });
+        // get the add remote call reference from gottiProcess's message queue.
+        const messageQueueRemoteDispatch = this.gottiProcess.messageQueue.addRemote.bind(this.gottiProcess.messageQueue);
+        const messageQueueInstantRemoteDispatch = this.gottiProcess.messageQueue.instantDispatch.bind(this.gottiProcess.messageQueue);
         this.areaChannel.onClientMessage((clientId, message) => {
             if (message[0] === 26 /* AREA_DATA */) {
                 //    this.onMessage();
             }
             else if (message[0] === 28 /* SYSTEM_MESSAGE */) {
-                //  this.onMessage(message[1]);
+                messageQueueRemoteDispatch(message[1], message[2], message[3], message[4]);
+            }
+            else if (message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
+                messageQueueInstantRemoteDispatch({ type: message[1], data: message[2], to: message[3], from: message[4] }, true);
             }
             else if (message[0] === 20 /* REQUEST_WRITE_AREA */) {
                 // [protocol, areaId, options]
