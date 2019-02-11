@@ -66,9 +66,6 @@ export declare abstract class Connector extends EventEmitter {
     protected onConnection: (client: any, req: any) => void;
     connectToAreas(): Promise<boolean>;
     abstract onMessage(client: Client, message: any): void;
-    onAddedAreaListen?(client: any, areaId: string, options?: any): void | Promise<any>;
-    onRemovedAreaListen?(client: any, areaId: string, options?: any): void | Promise<any>;
-    onChangedAreaWrite?(client: any, newAreaId: string, oldAreaId?: string): void | Promise<any>;
     onInit?(options: any): void;
     onJoin?(client: Client, auth: any): any | Promise<any>;
     onLeave?(client: Client, consented?: boolean): void | Promise<any>;
@@ -80,13 +77,22 @@ export declare abstract class Connector extends EventEmitter {
      * @returns {number}
      */
     requestJoin(auth: any): number | boolean;
-    send(client: Client, data: any): void;
     disconnect(closeHttp?: boolean): Promise<boolean>;
+    /**
+     * When a client succesfully joins a connector they need to make an initial area request
+     *  with options and whatever area id this connector value returns will be the first area
+     *  the player listens and writes to. from there use the ClientManager setClientWrite/addClientListen/ and removeClientListener
+     *  to change a players areas.
+     * @param client
+     * @param auth
+     * @param clientOptions
+     */
+    abstract getInitialArea(client: Client, auth: any, clientOptions?: any): any;
     protected broadcast(data: any, options?: BroadcastOptions): boolean;
-    private _onAreaMessages;
     private registerClientAreaMessageHandling;
     private registerAreaMessages;
     private _onAreaMessage;
+    private _getInitialArea;
     private _onWebClientMessage;
     private addAreaListen;
     /**
@@ -98,15 +104,6 @@ export declare abstract class Connector extends EventEmitter {
      */
     private changeAreaWrite;
     private removeAreaListen;
-    /**
-     * Used for validating user requested area changes.
-     * if provided, options get sent to area and will
-     * return asynchronously with response options from area
-     * or a boolean indicating success
-     */
-    private _requestAreaListen;
-    private _requestRemoveAreaListen;
-    private _requestAreaWrite;
     private _onJoin;
     private _onLeave;
     /**

@@ -105,9 +105,6 @@ class Connector extends events_1.EventEmitter {
     requestJoin(auth) {
         return 1;
     }
-    send(client, data) {
-        Protocol_1.send(client, [26 /* AREA_DATA */, data]);
-    }
     async disconnect(closeHttp = true) {
         this.autoDispose = true;
         let i = this.clients.length;
@@ -160,34 +157,23 @@ class Connector extends events_1.EventEmitter {
         }
     }
     */
-    _onAreaMessages() {
-        /*
-         this.masterChannel.frontChannels.forEach((frontChannel) => {
-         frontChannel.onMessage((data, channelId) => {
-         switch(data.protocol) {
-         case GottiProtocol.MESSAGE_QUEUE_RELAY,
-         case Protocol.ROOM_DATA,
-         }
-         });
-         });
-         */
-    }
     registerClientAreaMessageHandling(client) {
         client.channelClient.onMessage((message) => {
-            if (message[0] === 21 /* REQUEST_LISTEN_AREA */) {
+            if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
+                Protocol_1.send(client, message, false);
+            }
+            else if (message[0] === 22 /* ADD_CLIENT_AREA_LISTEN */) {
                 // message[1] areaId,
                 // message[2] options
                 this.addAreaListen(client, message[1], message[2]);
             }
-            else if (message[0] === 24 /* REQUEST_REMOVE_LISTEN_AREA */) {
+            else if (message[0] === 23 /* REMOVE_CLIENT_AREA_LISTEN */) {
                 this.removeAreaListen(client, message[1], message[2]);
             }
-            else if (message[0] === 20 /* REQUEST_WRITE_AREA */) {
+            else if (message[0] === 21 /* SET_CLIENT_AREA_WRITE */) {
+                console.log('got request to change write on connector from area');
                 // the removeOldWriteListener will be false since that should be explicitly sent from the old area itself.
                 this.changeAreaWrite(client, message[1], message[2]);
-            }
-            else if (message[0] === 26 /* AREA_DATA */ || message[0] === 30 /* GLOBAL_DATA */) {
-                // send(client, message);
             }
             else {
                 throw new Error('Unhandled client message protocol' + message[0]);
@@ -198,12 +184,18 @@ class Connector extends events_1.EventEmitter {
         Object.keys(this.channels).forEach(channelId => {
             const channel = this.channels[channelId];
             channel.onMessage((message) => {
-                if (message[0] === 26 /* AREA_DATA */ || message[0] === 30 /* GLOBAL_DATA */) {
-                    let numClients = channel.listeningClientUids.length;
+                if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
+                    // get all listening clients for area/channel
+                    const listeningClientUids = channel.listeningClientUids;
+                    let numClients = listeningClientUids.length;
+                    // iterate through all and relay message
                     while (numClients--) {
-                        const client = this.clients[numClients];
-                        Protocol_1.send(client, message, false);
+                        const client = this.clientsById[listeningClientUids[numClients]];
+                        console.log('RELAYING THE SYSTEM MESSAGE', message, 'to client, ', client.gottiId, 'from AREA ID', channel.channelId);
+                        Protocol_1.send(client, message);
                     }
+                }
+                else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {
                 }
             });
         });
@@ -211,28 +203,33 @@ class Connector extends events_1.EventEmitter {
     _onAreaMessage(message) {
         this.broadcast(message);
     }
+    async _getInitialArea(client, clientOptions) {
+        console.log('RUNNING GET INITIAL AREA!!!lwe');
+        const write = this.getInitialArea(client, client.auth, clientOptions);
+        if (write) {
+            // will dispatch area messages to systems
+            await this.changeAreaWrite(client, write.areaId, write.options);
+            return true;
+        }
+        else {
+            Protocol_1.send(client, 24 /* WRITE_AREA_ERROR */);
+            return false;
+        }
+    }
     _onWebClientMessage(client, message) {
         message = Protocol_1.decode(message);
         if (!message) {
             //    debugAndPrintError(`${this.roomName} (${this.roomId}), couldn't decode message: ${message}`);
             return;
         }
-        const queueAreaMessage = client.channelClient.sendLocal.bind(client.channelClient);
-        const immediateAreaMessage = client.channelClient.sendLocalImmediate.bind(client.channelClient);
         if (message[0] === 28 /* SYSTEM_MESSAGE */) {
             client.channelClient.sendLocal(message);
         }
         else if (message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
             client.channelClient.sendLocalImmediate(message);
         }
-        else if (message[0] === 21 /* REQUEST_LISTEN_AREA */) {
-            this._requestAreaListen(client, message[1], message[2]);
-        }
-        else if (message[0] === 24 /* REQUEST_REMOVE_LISTEN_AREA */) {
-            this._requestRemoveAreaListen(client, message[1], message[2]);
-        }
-        else if (message[0] === 20 /* REQUEST_WRITE_AREA */) {
-            this._requestAreaWrite(client, message[1], message[2]);
+        else if (message[0] === 20 /* GET_INITIAL_CLIENT_AREA_WRITE */) {
+            this._getInitialArea(client, message[1]);
         }
         else if (message[0] === 12 /* LEAVE_CONNECTOR */) {
             // stop interpreting messages from this client
@@ -245,17 +242,19 @@ class Connector extends events_1.EventEmitter {
     }
     async addAreaListen(client, areaId, options) {
         try {
-            const { responseOptions } = await client.channelClient.linkChannel(areaId, options);
-            const combinedOptions = responseOptions ? Util_1.merge(options, responseOptions) : options;
+            const linkedResponse = await client.channelClient.linkChannel(areaId, options);
+            console.log('response options were', linkedResponse);
             /* adds newest state from listened area to the clients queued state updates as a 'SET' update
              sendState method forwards then empties that queue, any future state updates from that area
              will be added to the client's queue as 'PATCH' updates. */
             // this.sendState(client);
-            this.onAddedAreaListen && this.onAddedAreaListen(client, areaId, combinedOptions);
-            Protocol_1.send(client, [21 /* REQUEST_LISTEN_AREA */, areaId, combinedOptions]);
+            Protocol_1.send(client, [22 /* ADD_CLIENT_AREA_LISTEN */, areaId, linkedResponse]);
             return true;
         }
         catch (err) {
+            console.log('clientId was:', client.gottiId);
+            console.log('areaId was', areaId);
+            console.log('error in addAreaListen was', err);
             //   console.log('error was', err);
             return false;
         }
@@ -274,10 +273,10 @@ class Connector extends events_1.EventEmitter {
             isLinked = await this.addAreaListen(client, newAreaId, writeOptions);
         }
         if (isLinked) {
+            console.log('setting client processor channel...');
             const success = client.channelClient.setProcessorChannel(newAreaId, false, writeOptions);
             if (success) {
-                this.onChangedAreaWrite(client, newAreaId, oldAreaId);
-                Protocol_1.send(client, [20 /* REQUEST_WRITE_AREA */, newAreaId]);
+                Protocol_1.send(client, [21 /* SET_CLIENT_AREA_WRITE */, newAreaId, writeOptions]);
                 return true;
             }
         }
@@ -288,41 +287,7 @@ class Connector extends events_1.EventEmitter {
             console.error('invalid areaId');
         }
         client.channelClient.unlinkChannel(areaId);
-        this.onRemovedAreaListen(client, areaId, options);
-        Protocol_1.send(client, [24 /* REQUEST_REMOVE_LISTEN_AREA */, areaId]);
-    }
-    /**
-     * Used for validating user requested area changes.
-     * if provided, options get sent to area and will
-     * return asynchronously with response options from area
-     * or a boolean indicating success
-     */
-    async _requestAreaListen(client, areaId, options) {
-        const frontChannel = this.masterChannel.frontChannels[areaId];
-        if (!(frontChannel))
-            return false;
-        const { responseOptions } = await client.channelClient.linkChannel(areaId, options);
-        const combinedOptions = responseOptions ? Util_1.merge(options, responseOptions) : options;
-        /* adds newest state from listened area to the clients queued state updates as a 'SET' update
-         sendState method forwards then empties that queue, any future state updates from that area
-         will be added to the client's queue as 'PATCH' updates. */
-        // this.sendState(client);
-        this.onAddedAreaListen && this.onAddedAreaListen(client, areaId, combinedOptions);
-        Protocol_1.send(client, [21 /* REQUEST_LISTEN_AREA */, areaId, combinedOptions]);
-    }
-    _requestRemoveAreaListen(client, areaId, options) {
-        const frontChannel = this.masterChannel.frontChannels[areaId];
-        if (!(frontChannel))
-            return false;
-        frontChannel.send([24 /* REQUEST_REMOVE_LISTEN_AREA */, options], areaId, client.gottiId);
-    }
-    async _requestAreaWrite(client, newAreaId, options) {
-        const processorChannelId = client.channelClient.processorChannel;
-        if (!(processorChannelId))
-            throw 'Client needs a processor channel before making area write requests.';
-        // const changed = await this.changeAreaWrite(client, newAreaId, options);
-        const frontChannel = this.masterChannel.frontChannels[newAreaId];
-        frontChannel.send([20 /* REQUEST_WRITE_AREA */, newAreaId, options], client.channelClient.processorChannel, client.gottiId);
+        Protocol_1.send(client, [23 /* REMOVE_CLIENT_AREA_LISTEN */, areaId, options]);
     }
     _onJoin(client, auth) {
         // clear the timeout and remove the reserved seat since player joined
@@ -334,15 +299,10 @@ class Connector extends events_1.EventEmitter {
         this.registerClientAreaMessageHandling(client);
         this.clients.push(client);
         this.clientsById[client.gottiId] = client;
-        console.log('onJoin was', this.onJoin);
-        console.log('this was', this);
         let joinOptions = null;
         if (this.onJoin) {
-            console.log('onJoin was', this.onJoin);
             joinOptions = this.onJoin(client, auth);
         }
-        console.log('sending can join with area options', this.areaOptions);
-        console.log('and joinOptions', joinOptions);
         Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, this.areaOptions, joinOptions]);
         client.on('message', this._onWebClientMessage.bind(this, client));
         client.once('close', this._onLeave.bind(this, client));
