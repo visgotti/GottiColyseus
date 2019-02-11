@@ -7,6 +7,12 @@ import { AreaClient as Client } from './AreaClient';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
 
+
+export enum LISTEN_REQUEST_FROM {
+    SERVER,
+    CLIENT,
+}
+
 export interface BroadcastOptions {
     except: Client;
 }
@@ -62,25 +68,19 @@ export class AreaRoom extends EventEmitter {
     }
 
     private startGottiProcess() {
+        this.gottiProcess.addRoom(this);
 
-        this.gottiProcess.decorateSystemsWithNetworkFunctions(this);
-
-        if(this.gottiProcess.clientManager.initialized) {
-            throw 'Initializing client manager multiple times'
-        }
         this.gottiProcess.clientManager.setClientWrite = (clientId, areaId, options?) => {
-            this.masterChannel.messageClient(clientId, [Protocol.REQUEST_WRITE_AREA, areaId, options]);
+            this.masterChannel.messageClient(clientId, [Protocol.SET_CLIENT_AREA_WRITE, areaId, options]);
         };
 
         this.gottiProcess.clientManager.removeClientListener = (clientId, options?) => {
-            this.masterChannel.messageClient(clientId, [Protocol.REQUEST_REMOVE_LISTEN_AREA, this.areaId, options]);
+            this.masterChannel.messageClient(clientId, [Protocol.REMOVE_CLIENT_AREA_LISTEN, this.areaId, options]);
         };
 
         this.gottiProcess.clientManager.setClientListen = (clientId, areaId, options?) => {
-            this.masterChannel.messageClient(clientId, [Protocol.REQUEST_LISTEN_AREA, areaId, options]);
+            this.masterChannel.messageClient(clientId, [Protocol.ADD_CLIENT_AREA_LISTEN, areaId, options]);
         };
-
-        this.gottiProcess.clientManager.initialized = true;
 
         this.gottiProcess.startAllSystems();
         this.gottiProcess.startLoop(this.gameLoopRate);
@@ -114,16 +114,17 @@ export class AreaRoom extends EventEmitter {
      * sends system message to all clients in the game.
      * @param message
      */
-    public dispatchGlobalSystemMessage(message: SystemMessage): void {
-        this.areaChannel.broadcast([Protocol.SYSTEM_MESSAGE, message]);
+    public dispatchToAllClients(message: SystemMessage): void {
+        this.areaChannel.broadcast([Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to, message.from ]);
     }
 
     /**
      * sends system message to all clients who are listening to it
      * @param message
      */
-    public dispatchLocalSystemMessage(message) {
-        this.areaChannel.broadcastLinked([Protocol.SYSTEM_MESSAGE, message])
+    public dispatchToLocalClients(message: SystemMessage) {
+        console.log('BROADCASTING LINKED!!!! WELL DOING DISPATCH TO LOCAL CLIENTS');
+        this.areaChannel.broadcastLinked([Protocol.SYSTEM_MESSAGE,  message.type, message.data, message.to, message.from ]);
     }
 
     /**
@@ -131,11 +132,11 @@ export class AreaRoom extends EventEmitter {
      * @param client
      * @param message
      */
-    public dispatchClientSystemMessage(client: Client, message: SystemMessage) {
+    public dispatchToClient(client: Client, message: SystemMessage) {
         this.masterChannel.messageClient(client.id, [Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to, message.from]);
     }
 
-    public dispatchSystemMessageToAreas(areaIds: Array<string>, message: SystemMessage) {
+    public dispatchToAreas(areaIds: Array<string>, message: SystemMessage) {
         this.areaChannel.sendMainFront([Protocol.AREA_TO_AREA_SYSTEM_MESSAGE, message.type, message.data, message.to, message.from, areaIds])
     }
 
@@ -144,9 +145,8 @@ export class AreaRoom extends EventEmitter {
     private _onGlobalMessage(clientId, message) {};
 
     private registerBackChannelMessages() {
-        this.areaChannel.onAddClientListen(this.gottiProcess.clientManager.onClientRequestListen.bind(this.gottiProcess.clientManager));
-
         this.areaChannel.onMessage((message) => {
+            console.log('got message', message);
             if (message[0] === Protocol.AREA_DATA) {
                 //    this.onMessage();
             } else if (message[0] === Protocol.AREA_TO_AREA_SYSTEM_MESSAGE) {
@@ -158,31 +158,26 @@ export class AreaRoom extends EventEmitter {
         const messageQueueRemoteDispatch = this.gottiProcess.messageQueue.addRemote.bind(this.gottiProcess.messageQueue);
         const messageQueueInstantRemoteDispatch = this.gottiProcess.messageQueue.instantDispatch.bind(this.gottiProcess.messageQueue);
 
+        const clientManager = this.gottiProcess.clientManager;
+
         this.areaChannel.onClientMessage((clientId, message) => {
-            if (message[0] === Protocol.AREA_DATA) {
+            const protocol = message[0];
+            if (protocol === Protocol.AREA_DATA) {
                 //    this.onMessage();
-            } else if (message[0] === Protocol.SYSTEM_MESSAGE) {
+            } else if (protocol === Protocol.SYSTEM_MESSAGE) {
                 messageQueueRemoteDispatch(message[1], message[2], message[3], message[4]);
-            } else if (message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
+            } else if (protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
                 messageQueueInstantRemoteDispatch({ type: message[1], data: message[2], to: message[3], from: message[4] }, true);
-            } else if (message[0] === Protocol.REQUEST_WRITE_AREA) {
-                // [protocol, areaId, options]
-                const write = this.gottiProcess.clientManager.onClientRequestWrite(clientId, message[1], message[2]);
-                if(write) {
-                    this.gottiProcess.clientManager.setClientWrite(clientId, message[1], write)
-                }
-            } else if (message[0] === Protocol.REQUEST_REMOVE_LISTEN_AREA) {
-                const removed = this.gottiProcess.clientManager(clientId, message[1]);
-                if(removed) {
-                    this.gottiProcess.clientManager.removeClientListener(clientId, removed);
-                }
             }
         });
 
-        this.areaChannel.onAddClientWrite.bind(this.gottiProcess.clientManager.onClientWrite.bind(this.gottiProcess));
-        this.areaChannel.onRemoveClientWrite.bind(this.gottiProcess.clientManager.onClientRemoveWrite.bind(this.gottiProcess));
-        this.areaChannel.onAddClientListen.bind(this.gottiProcess.clientManager.onClientListen.bind(this.gottiProcess));
-        this.areaChannel.onRemoveClientListen.bind(this.gottiProcess.clientManager.onClientRemoveListen.bind(this.gottiProcess));
-    }
+        this.areaChannel.onAddClientListen((clientUid, options) => {
+                clientManager.onClientListen.bind(clientManager);
+                return options || true;
+        });
 
+        this.areaChannel.onAddClientWrite(clientManager.onClientWrite.bind(clientManager));
+        this.areaChannel.onRemoveClientWrite(clientManager.onClientRemoveWrite.bind(clientManager));
+        this.areaChannel.onRemoveClientListen(clientManager.onClientRemoveListen.bind(clientManager));
+    }
 }
