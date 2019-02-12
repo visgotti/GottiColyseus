@@ -1,3 +1,4 @@
+import {publicDecrypt} from "crypto";
 const msgpack = require('notepack.io');
 import { Gate } from '../src';
 import { GameData } from '../src/Gate';
@@ -7,128 +8,252 @@ import * as mocha from 'mocha';
 
 const gateURI = 'tcp://127.0.0.1:7070';
 
-const mockGamesData = [
-    {
-        id: 'game1',
-        type: 'test',
-        connectorsData: [{
-            URL: '0',
-            serverIndex: 0,
-            connectedClients: 0,
-            gameId: 'game1',
-            heartbeat: () => {},
-        },{
-            URL: '1',
-            serverIndex: 1,
-            connectedClients: 0,
-            gameId: 'game1',
-            heartbeat: () => {},
-        }]
-    },
-    {
-        id: 'game2',
-        type: 'test',
-        connectorsData: [{
-            URL: '2',
-            serverIndex: 2,
-            connectedClients: 0,
-            gameId: 'game2',
-            heartbeat: () => {
-            },
-        }]
-    },
-    {
-        id: 'game3',
-        type: 'test3',
-        connectorsData: [{
-            URL: '3',
-            serverIndex: 3,
-            connectedClients: 0,
-            gameId: 'game3',
-            heartbeat: () => {
-            },
-        }]
+const mockGameData1 = {
+    connectorsData: [{ serverIndex: 0, URL: 'test' },{ serverIndex: 1, URL: 'test2' }],
+    gameType: 'arena',
+    gameId: 'arena1',
+    publicOptions: {
+        players: 0,
     }
-] as Array<GameData>;
+}
 
-const gateConfig = {
-    gateURI,
-    gamesData: mockGamesData
+const mockGameData2 = {
+    connectorsData: [{ serverIndex: 2, URL: 'test3' },{ serverIndex: 3, URL: 'test4' }],
+    gameType: 'arena',
+    gameId: 'arena2',
+    publicOptions: {
+        players: 0,
+    }
+}
+
+const mockGameData3 = {
+    connectorsData: [{ serverIndex: 4, URL: 'test5' },{ serverIndex: 5, URL: 'test6' }],
+    gameType: 'field',
+    gameId: 'field1',
+    publicOptions: {
+        players: 0,
+    }
 };
 
 describe('Gate', () => {
     let gate;
 
-    before('Creates Gate instance', (done) => {
+    beforeEach('Creates Gate instance', (done) => {
+        gate = null;
         gate = new Gate(gateURI);
         done();
     });
+    afterEach((done) => {
+        gate.disconnect();
+        done();
+    });
 
-    describe('Gate.formatGamesData', () => {
-        it('formats correctly', (done) => {
-            const { gamesById, gamesByType, connectorsByServerIndex, availableGamesByType } = (gate.formatGamesData(mockGamesData));
-            assert.ok(gamesById && gamesById && connectorsByServerIndex, availableGamesByType);
 
-            assert.strictEqual(Object.keys(gamesById).length, 3);
-            assert.strictEqual(Object.keys(gamesByType).length, 2);
-            assert.strictEqual(Object.keys(connectorsByServerIndex).length, 4);
-            assert.strictEqual(Object.keys(availableGamesByType).length, 2);
+    describe('Gate.addConnector', () => {
+        it('succesfully adds connector', (done) => {
+            gate.addConnector('URL', 0, 'gameId');
+            assert.strictEqual(gate.connectorsByServerIndex[0].URL, 'URL');
+            assert.strictEqual(gate.connectorsByServerIndex[0].connectedClients, 0);
+            assert.strictEqual(gate.connectorsByServerIndex[0].gameId, 'gameId');
             done();
-        })
+        });
+        it('throws if server index was duplicate', (done) => {
+            gate.addConnector('URL', 0, 'gameId');
+            assert.throws(() => { gate.addConnector('URL2', 0, 'gameId') } );
+            done();
+        });
+        it('throws if server URL was duplicate', (done) => {
+            gate.addConnector('URL', 0, 'gameId');
+            assert.throws(() => { gate.addConnector('URL', 1, 'gameId') } );
+            done();
+        });
+    });
+
+
+    describe('Gate.addGame', () => {
+        it('adds mock game data correctly', (done) => {
+            let { connectorsData, gameType, gameId, publicOptions } = mockGameData1;
+            gate.addGame(connectorsData, gameType, gameId, publicOptions);
+
+            ({ connectorsData, gameType, gameId, publicOptions } = mockGameData2);
+            gate.addGame(connectorsData, gameType, gameId, publicOptions);
+
+            ({ connectorsData, gameType, gameId, publicOptions } = mockGameData3);
+            gate.addGame(connectorsData, gameType, gameId, publicOptions);
+
+            assert.strictEqual(Object.keys(gate.gamesById).length, 3);
+
+            Object.keys(gate.gamesById).forEach(gameId => {
+                assert.strictEqual(gate.gamesById[gameId].connectorsData.length, 2);
+            });
+
+            assert.strictEqual(Object.keys(gate.availableGamesByType).length, 2);
+
+            assert.strictEqual(Object.keys(gate.availableGamesByType['arena']).length, 2);
+            assert.strictEqual(Object.keys(gate.availableGamesByType['field']).length, 1);
+            assert.strictEqual(Object.keys(gate.connectorsByServerIndex).length, 6);
+            done();
+        });
+
+        it('throws if game id was duplicate', (done) => {
+            let { connectorsData, gameType, gameId, publicOptions } = mockGameData1;
+            gate.addGame(connectorsData, gameType, gameId, publicOptions);
+            assert.throws(() => { gate.addGame(connectorsData, gameType, gameId, publicOptions) });
+            done();
+        });
+    });
+
+    describe('Gate.defineMatchMaker', () => {
+        let { connectorsData, gameType, gameId, publicOptions } = mockGameData1;
+        beforeEach('creates gate with one test game type', (done) => {
+            gate.addGame(connectorsData, gameType, gameId, publicOptions);
+            done();
+        });
+        it('adds to match maker map', (done) => {
+
+            gate.defineMatchMaker(gameType, (availableGames, auth, options) => {
+                return {
+                    gameId,
+                    seatOptions: {
+                        x: 25,
+                        y: 25
+                    }
+                }
+            });
+            assert.strictEqual(gate.matchMakersByGameType.size, 1);
+            done();
+        });
+
+        it('throws if gametype doesnt exist', (done) => {
+
+            assert.throws(() => {
+                gate.defineMatchMaker('werwer', (availableGames, auth, options) => {
+                    return {
+                        gameId,
+                        seatOptions: {
+                            x: 25,
+                            y: 25
+                        }
+                    }
+                });
+            });
+            done();
+        });
+    });
+
+    describe('Gate.matchMake', () => {
+        let { connectorsData, gameType, gameId, publicOptions } = mockGameData1;
+
+        beforeEach('creates gate and subs out addPlayerToConnector function', (done) => {
+            gate.addGame(connectorsData, gameType, gameId, publicOptions);
+
+            gate.addPlayerToConnector = (serverIndex, auth, seatOptions) => {
+                return {
+                    gottiId: '123',
+                    URL: connectorsData[0].URL,
+                }
+            };
+            done();
+        });
+        it('correctly runs the defined match maker', (done) => {
+            let called = false;
+            gate.defineMatchMaker(gameType, (availableGames, auth, options) => {
+                assert.deepStrictEqual(availableGames[gameId], gate.gamesById[gameId]);
+                assert.deepStrictEqual(auth, 'foobar');
+                assert.deepStrictEqual(options, 'clientoptions');
+                called = true;
+                return {
+                    gameId,
+                }
+
+            });
+            gate.matchMake(gameType, 'foobar', 'clientoptions');
+
+            setTimeout(() => {
+                assert.ok(called);
+                done();
+            }, 10)
+        });
+        it('throws if theres no handler', (done) => {
+            try {
+                assert.throws(() => { gate.matchMake(gameType, 'foobar', 'clientoptions') } );
+            } catch(err) {
+                assert.ok(err)
+                done();
+            }
+        });
+        it('throws if the returned game id doesnt exist', (done) => {
+            gate.defineMatchMaker(gameType, (availableGames, auth, options) => {
+                return {
+                    gameId: 'wrwesdijfiklu',
+                    seatOptions: {},
+                }
+            });
+            try {
+                assert.throws(() => { gate.matchMake(gameType, 'foobar', 'clientoptions') } );
+            } catch(err) {
+                assert.ok(err);
+                done();
+            }
+        });
     });
 
     describe('Gate.addPlayerToConnector / removePlayerFromConnector', () => {
+        let { connectorsData, gameType, gameId, publicOptions } = mockGameData1;
+
+        beforeEach('creates mock game and subs out reserve seat', (done) => {
+            gate.addGame(connectorsData, gameType, gameId, publicOptions);
+            gate.reserveSeat = (serverIndex, auth, seatOptions) => { return { URL: 'mock', gottiId: 'test'}};
+            done();
+        });
+
        it('adds 1 initially', (done) => {
-           (gate.addPlayerToConnector(0));
-           assert.strictEqual((gate.getClientCountOnConnector(0)), 1);
-           done();
+           gate.addPlayerToConnector(0).then(() => {
+               assert.strictEqual((gate.getClientCountOnConnector(0)), 1);
+               done();
+           });
        });
        it('sorted when added', (done) => {
-           const connectorsData = (gate.gamesById[gate.getGameIdOfConnector(0)].connectorsData);
-            assert.strictEqual(connectorsData.length, 2);
-            // first element should be serverIndex 1 and have 0 clients connected
-            assert.strictEqual(connectorsData[0].connectedClients, 0);
-            assert.strictEqual(connectorsData[0].serverIndex, 1);
+           gate.addPlayerToConnector(0).then(() => {
+               const connectorsData = (gate.gamesById[gate.getGameIdOfConnector(0)].connectorsData);
+               assert.strictEqual((gate.getClientCountOnConnector(0)), 1);
+               assert.strictEqual(connectorsData.length, 2);
+               // first element should be serverIndex 1 and have 0 clients connected
+               assert.strictEqual(connectorsData[0].connectedClients, 0);
+               assert.strictEqual(connectorsData[0].serverIndex, 1);
 
-           // next element should be serverIndex 0 and have 1 client connected
-           assert.strictEqual(connectorsData[1].connectedClients, 1);
-           assert.strictEqual(connectorsData[1].serverIndex, 0);
-           done();
+               // next element should be serverIndex 0 and have 1 client connected
+               assert.strictEqual(connectorsData[1].connectedClients, 1);
+               assert.strictEqual(connectorsData[1].serverIndex, 0);
+               done();
+           });
        });
 
        it('re sorts when the connector with most changes', (done) => {
-           (gate.addPlayerToConnector(1));
-           (gate.addPlayerToConnector(1));
-
-           const connectorsData = (gate.gamesById[gate.getGameIdOfConnector(0)].connectorsData);
-
-           assert.strictEqual(connectorsData.length, 2);
-           // first element should be serverIndex 0 and have 1 client connected
-           assert.strictEqual(connectorsData[0].connectedClients, 1);
-           assert.strictEqual(connectorsData[0].serverIndex, 0);
-
-           // next element should be serverIndex 1 and have 2 clients connected
-           assert.strictEqual(connectorsData[1].connectedClients, 2);
-           assert.strictEqual(connectorsData[1].serverIndex, 1);
-            done();
+           gate.addPlayerToConnector(0).then(() => {
+               const connectorsData = (gate.gamesById[gate.getGameIdOfConnector(0)].connectorsData);
+               assert.strictEqual(connectorsData[0].serverIndex, 1);
+               gate.addPlayerToConnector(1).then(() => {
+                   gate.addPlayerToConnector(1).then(() => {
+                        assert.strictEqual(connectorsData[0].serverIndex, 0);
+                        done();
+               })})
+           });
        });
 
         it('re sorts when the connector with most loses players', (done) => {
-            (gate.removePlayerFromConnector(1));
-            (gate.removePlayerFromConnector(1));
-
-            const connectorsData = (gate.gamesById[gate.getGameIdOfConnector(0)].connectorsData);
-
-            assert.strictEqual(connectorsData.length, 2);
-            // first element should be serverIndex 1 and have 0 clients connected
-            assert.strictEqual(connectorsData[0].connectedClients, 0);
-            assert.strictEqual(connectorsData[0].serverIndex, 1);
-
-            // next element was server index 0 and still has 1 client connected
-            assert.strictEqual(connectorsData[1].connectedClients, 1);
-            assert.strictEqual(connectorsData[1].serverIndex, 0);
-            done();
-
+            gate.addPlayerToConnector(0).then(() => {
+                const connectorsData = (gate.gamesById[gate.getGameIdOfConnector(0)].connectorsData);
+                assert.strictEqual(connectorsData[0].serverIndex, 1);
+                gate.addPlayerToConnector(1).then(() => {
+                    gate.addPlayerToConnector(1).then(() => {
+                        assert.strictEqual(connectorsData[0].serverIndex, 0);
+                        gate.removePlayerFromConnector(1);
+                        gate.removePlayerFromConnector(1);
+                        assert.strictEqual(connectorsData[0].serverIndex, 1);
+                        done();
+                    })})
+            });
         });
     });
 
