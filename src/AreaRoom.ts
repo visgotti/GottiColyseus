@@ -123,7 +123,6 @@ export class AreaRoom extends EventEmitter {
      * @param message
      */
     public dispatchToLocalClients(message: SystemMessage) {
-        console.log('BROADCASTING LINKED!!!! WELL DOING DISPATCH TO LOCAL CLIENTS');
         this.areaChannel.broadcastLinked([Protocol.SYSTEM_MESSAGE,  message.type, message.data, message.to, message.from ]);
     }
 
@@ -132,8 +131,8 @@ export class AreaRoom extends EventEmitter {
      * @param client
      * @param message
      */
-    public dispatchToClient(client: Client, message: SystemMessage) {
-        this.masterChannel.messageClient(client.id, [Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to, message.from]);
+    public dispatchToClient(clientId: string, message: SystemMessage) {
+        this.masterChannel.messageClient(clientId, [Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to, message.from]);
     }
 
     public dispatchToAreas(areaIds: Array<string>, message: SystemMessage) {
@@ -172,7 +171,7 @@ export class AreaRoom extends EventEmitter {
         });
 
         this.areaChannel.onAddClientListen((clientUid, options) => {
-                clientManager.onClientListen.bind(clientManager);
+                clientManager.onClientListen(clientUid, options);
                 return options || true;
         });
 
