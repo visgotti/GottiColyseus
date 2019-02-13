@@ -16,5 +16,6 @@ export type ConnectorClient = WebSocket & {
     sessionId: string;
     pingCount: number; // ping / pong
     auth?: any; // custom data set through Room's verifyClient method.
-    channelClient: ChannelClient;
+    seatOptions?: any; //options sent from gate server when reserved seat
+    channelClient: ChannelClient; // client that keeps track of channels/areas a client is interacting with
 };

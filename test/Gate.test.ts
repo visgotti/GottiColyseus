@@ -9,7 +9,7 @@ import * as mocha from 'mocha';
 const gateURI = 'tcp://127.0.0.1:7070';
 
 const mockGameData1 = {
-    connectorsData: [{ serverIndex: 0, URL: 'test' },{ serverIndex: 1, URL: 'test2' }],
+    connectorsData: [{ serverIndex: 0, host: 'test', port: 0 },{ serverIndex: 1, host: 'test', port: 1 }],
     gameType: 'arena',
     gameId: 'arena1',
     publicOptions: {
@@ -18,7 +18,7 @@ const mockGameData1 = {
 }
 
 const mockGameData2 = {
-    connectorsData: [{ serverIndex: 2, URL: 'test3' },{ serverIndex: 3, URL: 'test4' }],
+    connectorsData: [{ serverIndex: 2, host: 'test', port: 2 },{ serverIndex: 3, host: 'test', port: 3 }],
     gameType: 'arena',
     gameId: 'arena2',
     publicOptions: {
@@ -27,7 +27,7 @@ const mockGameData2 = {
 }
 
 const mockGameData3 = {
-    connectorsData: [{ serverIndex: 4, URL: 'test5' },{ serverIndex: 5, URL: 'test6' }],
+    connectorsData: [{ serverIndex: 4, host: 'test', port: 4 },{ serverIndex: 5, host: 'test', port: 5 }],
     gameType: 'field',
     gameId: 'field1',
     publicOptions: {
@@ -51,20 +51,20 @@ describe('Gate', () => {
 
     describe('Gate.addConnector', () => {
         it('succesfully adds connector', (done) => {
-            gate.addConnector('URL', 0, 'gameId');
-            assert.strictEqual(gate.connectorsByServerIndex[0].URL, 'URL');
+            gate.addConnector('host', 1, 0, 'gameId');
+            assert.strictEqual(gate.connectorsByServerIndex[0].host, 'host');
             assert.strictEqual(gate.connectorsByServerIndex[0].connectedClients, 0);
             assert.strictEqual(gate.connectorsByServerIndex[0].gameId, 'gameId');
             done();
         });
         it('throws if server index was duplicate', (done) => {
-            gate.addConnector('URL', 0, 'gameId');
-            assert.throws(() => { gate.addConnector('URL2', 0, 'gameId') } );
+            gate.addConnector('host', 1, 0, 'gameId');
+            assert.throws(() => { gate.addConnector('host2', 3231, 0, 'gameId') } );
             done();
         });
-        it('throws if server URL was duplicate', (done) => {
-            gate.addConnector('URL', 0, 'gameId');
-            assert.throws(() => { gate.addConnector('URL', 1, 'gameId') } );
+        it('throws if server host and port was duplicate', (done) => {
+            gate.addConnector('host', 0, 0, 'gameId');
+            assert.throws(() => { gate.addConnector('host', 0, 1, 'gameId') } );
             done();
         });
     });
@@ -150,7 +150,8 @@ describe('Gate', () => {
             gate.addPlayerToConnector = (serverIndex, auth, seatOptions) => {
                 return {
                     gottiId: '123',
-                    URL: connectorsData[0].URL,
+                    host: connectorsData[0].host,
+                    port: connectorsData[0].port
                 }
             };
             done();
@@ -203,7 +204,7 @@ describe('Gate', () => {
 
         beforeEach('creates mock game and subs out reserve seat', (done) => {
             gate.addGame(connectorsData, gameType, gameId, publicOptions);
-            gate.reserveSeat = (serverIndex, auth, seatOptions) => { return { URL: 'mock', gottiId: 'test'}};
+            gate.reserveSeat = (serverIndex, auth, seatOptions) => { return { host: 'mock', port: 1, gottiId: 'test'}};
             done();
         });
 
