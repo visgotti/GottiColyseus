@@ -32,6 +32,7 @@ const nanoid = require('nanoid');
 import { EventEmitter } from 'events';
 
 import { ConnectorClient as Client } from './ConnectorClient';
+import {setInterval} from "timers";
 
 //import { debugAndPrintError, debugPatch, debugPatchData } from '../../colyseus/lib/Debug';
 
@@ -40,6 +41,8 @@ const DEFAULT_SIMULATION_INTERVAL = 1000 / 60; // 60fps (16.66ms)
 
 const DEFAULT_SEAT_RESERVATION_TIME = 3;
 
+const DEFAULT_RELAY_RATE = 1000 / 30; // 30fpS
+
 export type SimulationCallback = (deltaTime?: number) => void;
 
 export type ConnectorOptions = IServerOptions & {
@@ -47,6 +50,7 @@ export type ConnectorOptions = IServerOptions & {
     gracefullyShutdown?: boolean,
     server: string,
     port?: number,
+    messageRelayRate?: number,
     serverIndex: number,
     connectorURI: string,
     gateURI: string,
@@ -90,15 +94,19 @@ export abstract class Connector extends EventEmitter {
     public clientsById: {[sessionId: string]: Client} = {};
 
     private _patchInterval: NodeJS.Timer;
+    private _relayMessageTimeout: NodeJS.Timer;
 
     private server: any;
     private gateURI: string;
     private responder: Responder;
     private reservedSeats: {[clientId: string]: any} = {};
 
+    private messageRelayRate: number; // 20 fps
+
     constructor(options: ConnectorOptions) {
         super();
 
+        this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
         this.areaServerURIs = options.areaServerURIs;
@@ -123,6 +131,25 @@ export abstract class Connector extends EventEmitter {
 
         this.registerGateResponders();
         //this.setPatchRate(this.patchRate);
+    }
+
+    protected setMessageRelayRate(rate: number) {
+        this.messageRelayRate = rate;
+    }
+
+    protected startMessageRelay() {
+        this.relayMessages();
+    }
+
+    protected stopMessageRelay() {
+        clearTimeout(this._relayMessageTimeout);
+    }
+
+    private relayMessages() {
+        this._relayMessageTimeout = setTimeout(() => {
+            this.masterChannel.sendQueuedMessages();
+            this.relayMessages();
+        }, this.messageRelayRate)
     }
 
     protected onConnection = (client: Client, req: http.IncomingMessage & any) => {
@@ -157,14 +184,13 @@ export abstract class Connector extends EventEmitter {
                 this.masterChannel.connect().then((connection) => {
 
                     this.areaOptions = connection.backChannelOptions;
-                    console.log('area options became', this.areaOptions);
                     this.registerAreaMessages();
 
                     this.server = new WebSocket.Server(this.options);
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
 
-                    console.log(`Connector ${this.serverIndex} succesfully listening for client connections on port ${this.port}`)
+                    this.startMessageRelay();
 
                     return resolve(true);
                 });
@@ -195,6 +221,7 @@ export abstract class Connector extends EventEmitter {
     }
 
     public async disconnect(closeHttp: boolean=true) : Promise<boolean> {
+        this.stopMessageRelay();
         this.autoDispose = true;
 
         let i = this.clients.length;
@@ -266,7 +293,6 @@ export abstract class Connector extends EventEmitter {
     private registerClientAreaMessageHandling(client) {
         client.channelClient.onMessage((message) => {
             if(message[0] === Protocol.SYSTEM_MESSAGE || message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
-                console.log('gto client message', message);
                 send(client, message);
             } else if (message[0] === Protocol.ADD_CLIENT_AREA_LISTEN) {
                 // message[1] areaId,
@@ -277,7 +303,6 @@ export abstract class Connector extends EventEmitter {
                 this.removeAreaListen(client, message[1], message[2]);
             }
             else if(message[0] === Protocol.SET_CLIENT_AREA_WRITE) {
-                console.log('got request to change write on connector from area');
                 // the removeOldWriteListener will be false since that should be explicitly sent from the old area itself.
                 this.changeAreaWrite(client, message[1], message[2]);
             } else {
@@ -290,16 +315,13 @@ export abstract class Connector extends EventEmitter {
         Object.keys(this.channels).forEach(channelId => {
             const channel = this.channels[channelId];
             channel.onMessage((message) => {
-                console.log('gto message', message);
                 if(message[0] === Protocol.SYSTEM_MESSAGE || message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
                     // get all listening clients for area/channel
-                    console.log('got the remote system', message);
                     const listeningClientUids = channel.listeningClientUids;
                     let numClients = listeningClientUids.length;
                     // iterate through all and relay message
                     while (numClients--) {
                         const client = this.clientsById[ listeningClientUids[numClients] ];
-                        console.log('RELAYING THE SYSTEM MESSAGE', message, 'to client, ', client.gottiId, 'from AREA ID', channel.channelId);
                         send(client, message);
                     }
                 } else if (message[0] === Protocol.AREA_TO_AREA_SYSTEM_MESSAGE) {
@@ -313,9 +335,7 @@ export abstract class Connector extends EventEmitter {
     }
 
     private async _getInitialWriteArea(client, clientOptions?: any) : Promise<boolean> {
-        console.log('RUNNING GET INITIAL AREA!!!lwe');
         const write = this.getInitialWriteArea(client, this.areaOptions, clientOptions);
-        console.log('THE INITIAL WRITE AREA WINDED UP BEING', write.areaId);
         if(write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);
@@ -354,7 +374,6 @@ export abstract class Connector extends EventEmitter {
         try{
             const linkedResponse = await client.channelClient.linkChannel(areaId, options);
 
-            console.log('response options were', linkedResponse);
             /* adds newest state from listened area to the clients queued state updates as a 'SET' update
              sendState method forwards then empties that queue, any future state updates from that area
              will be added to the client's queue as 'PATCH' updates. */
@@ -389,7 +408,6 @@ export abstract class Connector extends EventEmitter {
         }
 
         if(isLinked) {
-            console.log('setting client processor channel...');
             const success = client.channelClient.setProcessorChannel(newAreaId, false, writeOptions);
             if(success) {
                 send(client, [Protocol.SET_CLIENT_AREA_WRITE, newAreaId, writeOptions]);
