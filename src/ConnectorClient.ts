@@ -12,6 +12,7 @@ import * as http from 'http';
 export type ConnectorClient = WebSocket & {
     upgradeReq?: http.IncomingMessage; // cross-compatibility for ws (v3.x+) and uws
     id: string;
+    gottiId: string;
     options: any;
     sessionId: string;
     pingCount: number; // ping / pong

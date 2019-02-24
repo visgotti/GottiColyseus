@@ -71,7 +71,6 @@ export function decode(message: any) {
 }
 
 export function send(client: ConnectorClient, message: any, encode: boolean = true) {
-    console.log('attempting to send... message', message);
     if (client.readyState === WebSocket.OPEN) {
         client.send((encode && msgpack.encode(message)) || message, { binary: true });
     }

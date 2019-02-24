@@ -325,13 +325,14 @@ export abstract class Connector extends EventEmitter {
                         send(client, message);
                     }
                 } else if (message[0] === Protocol.AREA_TO_AREA_SYSTEM_MESSAGE) {
+                    // [protocol, type, data, to, from, areaIds]
+                    const toAreaIds = message[5];
+                    // reassign last value in array to the from area id
+                    message[5] = channel.channelId;
+                    channel.broadcast(message, toAreaIds)
                 }
             });
         });
-    }
-
-    private _onAreaMessage(message) {
-        this.broadcast(message);
     }
 
     private async _getInitialWriteArea(client, clientOptions?: any) : Promise<boolean> {
