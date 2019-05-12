@@ -454,12 +454,14 @@ export abstract class Connector extends EventEmitter {
 
     private async _onLeave(client: Client, code?: number): Promise<any> {
         // call abstract 'onLeave' method only if the client has been successfully accepted.
-        if (spliceOne(this.clients, this.clients.indexOf(client)) && this.onLeave) {
+        if (spliceOne(this.clients, this.clients.indexOf(client))) {
             delete this.clientsById[client.sessionId];
             // disconnect gotti client too.
             client.channelClient.unlinkChannel();
-            await this.onLeave(client, (code === WS_CLOSE_CONSENTED));
             //TODO: notify gate server
+
+            // If user defined onLeave, run it.
+            this.onLeave && this.onLeave(client, (code === WS_CLOSE_CONSENTED));
         }
 
         this.emit('leave', client);

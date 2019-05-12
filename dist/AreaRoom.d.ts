@@ -34,6 +34,8 @@ export declare class AreaRoom extends EventEmitter {
     private _patchInterval;
     state: any;
     private gottiProcess;
+    private writingClientIds;
+    private listeningClientIds;
     constructor(gottiProcess: any, areaId: any, publicOptions?: any);
     initializeAndStart(masterChannel: any, areaChannel: any): void;
     private startGottiProcess;
@@ -55,8 +57,8 @@ export declare class AreaRoom extends EventEmitter {
      * @param client
      * @param message
      */
-    dispatchToClient(client: Client, message: SystemMessage): void;
-    dispatchToAreas(areaIds: Array<string>, message: SystemMessage): void;
+    dispatchToClient(clientId: string, message: SystemMessage): void;
+    dispatchToAreas(message: SystemMessage, areaIds?: Array<string>): void;
     private _onConnectorMessage;
     private _onMessage;
     private _onGlobalMessage;

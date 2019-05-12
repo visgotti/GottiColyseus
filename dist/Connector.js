@@ -24,6 +24,7 @@ const events_1 = require("events");
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
 const DEFAULT_SIMULATION_INTERVAL = 1000 / 60; // 60fps (16.66ms)
 const DEFAULT_SEAT_RESERVATION_TIME = 3;
+const DEFAULT_RELAY_RATE = 1000 / 30; // 30fpS
 class Connector extends events_1.EventEmitter {
     constructor(options) {
         super();
@@ -46,12 +47,13 @@ class Connector extends events_1.EventEmitter {
             }
             else {
                 client.gottiId = req.gottiId;
-                this._onJoin(client, this.reservedSeats[req.gottiId].auth);
+                this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
             }
             // prevent server crashes if a single client had unexpected error
             client.on('error', (err) => console.error(err.message + '\n' + err.stack));
             //send(client, [Protocol.USER_ID, client.gottiId])
         };
+        this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE;
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
         this.areaServerURIs = options.areaServerURIs;
@@ -76,6 +78,21 @@ class Connector extends events_1.EventEmitter {
         this.registerGateResponders();
         //this.setPatchRate(this.patchRate);
     }
+    setMessageRelayRate(rate) {
+        this.messageRelayRate = rate;
+    }
+    startMessageRelay() {
+        this.relayMessages();
+    }
+    stopMessageRelay() {
+        clearTimeout(this._relayMessageTimeout);
+    }
+    relayMessages() {
+        this._relayMessageTimeout = setTimeout(() => {
+            this.masterChannel.sendQueuedMessages();
+            this.relayMessages();
+        }, this.messageRelayRate);
+    }
     async connectToAreas() {
         this.masterChannel = new dist_2.FrontMaster(this.serverIndex);
         this.masterChannel.initialize(this.connectorURI, this.areaServerURIs);
@@ -86,26 +103,27 @@ class Connector extends events_1.EventEmitter {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
                     this.areaOptions = connection.backChannelOptions;
-                    console.log('area options became', this.areaOptions);
                     this.registerAreaMessages();
                     this.server = new WebSocket.Server(this.options);
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
-                    console.log(`Connector ${this.serverIndex} succesfully listening for client connections on port ${this.port}`);
+                    this.startMessageRelay();
                     return resolve(true);
                 });
             }, 500);
         });
     }
     /**
-     * @param clientId - id client authenticated from gate server as
      * @param auth - authentication data sent from Gate server.
+     * @param seatOptions - additional options that may have sent from gate server, you can add/remove properties
+     * to it in request join and it will persist onto the client object.
      * @returns {number}
      */
-    requestJoin(auth) {
+    requestJoin(auth, seatOptions) {
         return 1;
     }
     async disconnect(closeHttp = true) {
+        this.stopMessageRelay();
         this.autoDispose = true;
         let i = this.clients.length;
         while (i--) {
@@ -160,7 +178,7 @@ class Connector extends events_1.EventEmitter {
     registerClientAreaMessageHandling(client) {
         client.channelClient.onMessage((message) => {
             if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
-                Protocol_1.send(client, message, false);
+                Protocol_1.send(client, message);
             }
             else if (message[0] === 22 /* ADD_CLIENT_AREA_LISTEN */) {
                 // message[1] areaId,
@@ -171,7 +189,6 @@ class Connector extends events_1.EventEmitter {
                 this.removeAreaListen(client, message[1], message[2]);
             }
             else if (message[0] === 21 /* SET_CLIENT_AREA_WRITE */) {
-                console.log('got request to change write on connector from area');
                 // the removeOldWriteListener will be false since that should be explicitly sent from the old area itself.
                 this.changeAreaWrite(client, message[1], message[2]);
             }
@@ -191,21 +208,21 @@ class Connector extends events_1.EventEmitter {
                     // iterate through all and relay message
                     while (numClients--) {
                         const client = this.clientsById[listeningClientUids[numClients]];
-                        console.log('RELAYING THE SYSTEM MESSAGE', message, 'to client, ', client.gottiId, 'from AREA ID', channel.channelId);
                         Protocol_1.send(client, message);
                     }
                 }
                 else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {
+                    // [protocol, type, data, to, from, areaIds]
+                    const toAreaIds = message[5];
+                    // reassign last value in array to the from area id
+                    message[5] = channel.channelId;
+                    channel.broadcast(message, toAreaIds);
                 }
             });
         });
     }
-    _onAreaMessage(message) {
-        this.broadcast(message);
-    }
-    async _getInitialArea(client, clientOptions) {
-        console.log('RUNNING GET INITIAL AREA!!!lwe');
-        const write = this.getInitialArea(client, client.auth, clientOptions);
+    async _getInitialWriteArea(client, clientOptions) {
+        const write = this.getInitialWriteArea(client, this.areaOptions, clientOptions);
         if (write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);
@@ -229,7 +246,7 @@ class Connector extends events_1.EventEmitter {
             client.channelClient.sendLocalImmediate(message);
         }
         else if (message[0] === 20 /* GET_INITIAL_CLIENT_AREA_WRITE */) {
-            this._getInitialArea(client, message[1]);
+            this._getInitialWriteArea(client, message[1]);
         }
         else if (message[0] === 12 /* LEAVE_CONNECTOR */) {
             // stop interpreting messages from this client
@@ -243,7 +260,6 @@ class Connector extends events_1.EventEmitter {
     async addAreaListen(client, areaId, options) {
         try {
             const linkedResponse = await client.channelClient.linkChannel(areaId, options);
-            console.log('response options were', linkedResponse);
             /* adds newest state from listened area to the clients queued state updates as a 'SET' update
              sendState method forwards then empties that queue, any future state updates from that area
              will be added to the client's queue as 'PATCH' updates. */
@@ -273,7 +289,6 @@ class Connector extends events_1.EventEmitter {
             isLinked = await this.addAreaListen(client, newAreaId, writeOptions);
         }
         if (isLinked) {
-            console.log('setting client processor channel...');
             const success = client.channelClient.setProcessorChannel(newAreaId, false, writeOptions);
             if (success) {
                 Protocol_1.send(client, [21 /* SET_CLIENT_AREA_WRITE */, newAreaId, writeOptions]);
@@ -289,7 +304,7 @@ class Connector extends events_1.EventEmitter {
         client.channelClient.unlinkChannel(areaId);
         Protocol_1.send(client, [23 /* REMOVE_CLIENT_AREA_LISTEN */, areaId, options]);
     }
-    _onJoin(client, auth) {
+    _onJoin(client, auth, seatOptions) {
         // clear the timeout and remove the reserved seat since player joined
         clearTimeout(this.reservedSeats[client.gottiId].timeout);
         delete this.reservedSeats[client.gottiId];
@@ -299,22 +314,27 @@ class Connector extends events_1.EventEmitter {
         this.registerClientAreaMessageHandling(client);
         this.clients.push(client);
         this.clientsById[client.gottiId] = client;
+        client.auth = auth;
+        client.seatOptions = seatOptions;
         let joinOptions = null;
         if (this.onJoin) {
-            joinOptions = this.onJoin(client, auth);
+            joinOptions = this.onJoin(client);
         }
+        client.auth = auth;
+        client.seatOptions = seatOptions;
         Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, this.areaOptions, joinOptions]);
         client.on('message', this._onWebClientMessage.bind(this, client));
         client.once('close', this._onLeave.bind(this, client));
     }
     async _onLeave(client, code) {
         // call abstract 'onLeave' method only if the client has been successfully accepted.
-        if (Util_1.spliceOne(this.clients, this.clients.indexOf(client)) && this.onLeave) {
+        if (Util_1.spliceOne(this.clients, this.clients.indexOf(client))) {
             delete this.clientsById[client.sessionId];
             // disconnect gotti client too.
             client.channelClient.unlinkChannel();
-            await this.onLeave(client, (code === Protocol_1.WS_CLOSE_CONSENTED));
             //TODO: notify gate server
+            // If user defined onLeave, run it.
+            this.onLeave && this.onLeave(client, (code === Protocol_1.WS_CLOSE_CONSENTED));
         }
         this.emit('leave', client);
     }
@@ -322,11 +342,13 @@ class Connector extends events_1.EventEmitter {
      * reserves seat till player joins
      * @param clientId - id of player to reserve seat for
      * @param auth - data player authenticated with on gate.
+     * @param seatOptions - additional data sent from the gate
      * @private
      */
-    _reserveSeat(clientId, auth) {
+    _reserveSeat(clientId, auth, seatOptions) {
         this.reservedSeats[clientId] = {
             auth,
+            seatOptions,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
             }, 10000) // reserve seat for 10 seconds
@@ -339,12 +361,13 @@ class Connector extends events_1.EventEmitter {
      * @private
      */
     _requestJoin(data) {
-        const auth = data[0];
-        if (this.requestJoin(auth)) {
+        const auth = data && data.auth ? data.auth : {};
+        const seatOptions = data && data.seatOptions ? data.seatOptions : {};
+        if (this.requestJoin(auth, seatOptions)) {
             const gottiId = Util_1.generateId();
-            this._reserveSeat(gottiId, auth);
+            this._reserveSeat(gottiId, auth, seatOptions);
             // todo send host n port
-            return { URL: this.port, gottiId };
+            return { serverIndex: this.port, gottiId };
         }
         else {
             return false;

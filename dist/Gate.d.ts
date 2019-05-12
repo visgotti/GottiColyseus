@@ -1,33 +1,59 @@
 export interface ConnectorData {
-    URL: string;
+    host: string;
+    port: number;
     serverIndex: number;
     connectedClients: number;
     gameId: string;
     heartbeat?: Function;
+    reserveSeat?: Function;
 }
+/**
+ * @param availableGames - map of games by id of a certain type
+ * @param auth - user authentication data
+ * @param clientOptions - additional options client may have passed in game request
+ */
+export declare type MatchMakerFunction = (availableGames: any, auth: any, clientOptions?: any) => {
+    gameId: string;
+    seatOptions: any;
+};
 export interface GameData {
     connectorsData: Array<ConnectorData>;
     id: string;
     type: string;
     region?: string;
+    publicOptions?: any;
     options?: any;
 }
 export interface GateConfig {
     gateURI: string;
     gamesData: Array<GameData>;
 }
+export declare type ClientConnectorLookup = Map<string, number>;
 export declare class Gate {
     urls: any[];
     private connectorsByServerIndex;
-    private gamesByType;
+    private connectedClients;
+    private pendingClients;
     private gamesById;
     private requestBroker;
     private requester;
     private availableGamesByType;
+    private unavailableGamesById;
+    private matchMakersByGameType;
     private heartbeat;
+    private makeGameAvailable;
+    private makeGameUnavailable;
     constructor(gateURI: any);
-    addConnector(URL: any, serverIndex: any, gameType: any): void;
-    initializeServer(config: GateConfig): void;
+    defineMatchMaker(gameType: any, MatchMakerFunction: any): void;
+    private createHeartbeatForConnector;
+    private createReserveSeatForConnector;
+    private reserveSeat;
+    addGame(connectorsData: Array<{
+        serverIndex: number;
+        host: string;
+        port: number;
+    }>, gameType: any, gameId: any, publicOptions?: any): void;
+    private addConnector;
     /**
      * Handles the request from a player for a certain game type. needs work
      * right now the reuest has gameId and then the gate server will
@@ -37,20 +63,26 @@ export declare class Gate {
      * @returns {Response|undefined}
      */
     gameRequested(req: any, res: any): Promise<any>;
-    private matchMake;
     /**
-     * Returns lowest valued gameId in map.
-     * @param gamesById - Dictionary of available games for a certain game type
+     *
+     * @param gameType - type of game requested
+     * @param auth - user authentication data
+     * @param clientOptions - additional data about game request sent from client
+     * @returns {{host, port, gottiId}}
      */
-    private defaultMatchMaker;
+    private matchMake;
+    private getPublicGateData;
     gateKeep(req: any, res: any): void;
     registerGateKeep(handler: (request: any, response: any) => any): void;
     private onGateKeepHandler;
     private validateGameRequest;
     private getLeastPopulatedConnector;
     /**
-     * Adds a player to the connector's count and then resorts the pool
-     * @param serverIndex - server index that the connector lives on.
+     *
+     * @param serverIndex
+     * @param auth
+     * @param seatOptions
+     * @returns {{host, port, gottiId}}
      */
     private addPlayerToConnector;
     /**
@@ -62,9 +94,7 @@ export declare class Gate {
     stopConnectorHeartbeat(): void;
     private handleHeartbeatError;
     private handleHeartbeatResponse;
-    private formatGamesData;
     private getClientCountOnConnector;
     private getGameIdOfConnector;
-    private createRequestsForConnector;
-    private reserveRoom;
+    private disconnect;
 }

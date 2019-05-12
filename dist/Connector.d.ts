@@ -20,6 +20,7 @@ export declare type ConnectorOptions = IServerOptions & {
     gracefullyShutdown?: boolean;
     server: string;
     port?: number;
+    messageRelayRate?: number;
     serverIndex: number;
     connectorURI: string;
     gateURI: string;
@@ -58,25 +59,32 @@ export declare abstract class Connector extends EventEmitter {
         [sessionId: string]: Client;
     };
     private _patchInterval;
+    private _relayMessageTimeout;
     private server;
     private gateURI;
     private responder;
     private reservedSeats;
+    private messageRelayRate;
     constructor(options: ConnectorOptions);
+    protected setMessageRelayRate(rate: number): void;
+    protected startMessageRelay(): void;
+    protected stopMessageRelay(): void;
+    private relayMessages;
     protected onConnection: (client: any, req: any) => void;
     connectToAreas(): Promise<boolean>;
     abstract onMessage(client: Client, message: any): void;
     onInit?(options: any): void;
-    onJoin?(client: Client, auth: any): any | Promise<any>;
+    onJoin?(client: Client): any | Promise<any>;
     onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     onDispose?(): void | Promise<any>;
     onAuth?(options: any): boolean;
     /**
-     * @param clientId - id client authenticated from gate server as
      * @param auth - authentication data sent from Gate server.
+     * @param seatOptions - additional options that may have sent from gate server, you can add/remove properties
+     * to it in request join and it will persist onto the client object.
      * @returns {number}
      */
-    requestJoin(auth: any): number | boolean;
+    requestJoin(auth: any, seatOptions: any): number | boolean;
     disconnect(closeHttp?: boolean): Promise<boolean>;
     /**
      * When a client succesfully joins a connector they need to make an initial area request
@@ -84,15 +92,18 @@ export declare abstract class Connector extends EventEmitter {
      *  the player listens and writes to. from there use the ClientManager setClientWrite/addClientListen/ and removeClientListener
      *  to change a players areas.
      * @param client
-     * @param auth
-     * @param clientOptions
+     * @param areaOptions - options set on area before the game to help connector figure out which area to return
+     * @param clientOptions - options sent from the client when starting the game.
+     * @returns { areaId: string, options: any } - areaId the client is going to write to and any additional options to send.
      */
-    abstract getInitialArea(client: Client, auth: any, clientOptions?: any): any;
+    abstract getInitialWriteArea(client: Client, areaOptions: any, clientOptions?: any): {
+        areaId: string;
+        options: any;
+    };
     protected broadcast(data: any, options?: BroadcastOptions): boolean;
     private registerClientAreaMessageHandling;
     private registerAreaMessages;
-    private _onAreaMessage;
-    private _getInitialArea;
+    private _getInitialWriteArea;
     private _onWebClientMessage;
     private addAreaListen;
     /**
@@ -110,6 +121,7 @@ export declare abstract class Connector extends EventEmitter {
      * reserves seat till player joins
      * @param clientId - id of player to reserve seat for
      * @param auth - data player authenticated with on gate.
+     * @param seatOptions - additional data sent from the gate
      * @private
      */
     private _reserveSeat;

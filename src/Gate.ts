@@ -213,7 +213,7 @@ export class Gate {
 
         const { auth, options, gameType } = validated;
 
-        const { host, port, gottiId} = await this.matchMake(gameType, auth, options);
+        const { host, port, gottiId } = await this.matchMake(gameType, auth, options);
 
         if(host && port) {
             return res.status(200).json({ host, port, gottiId });

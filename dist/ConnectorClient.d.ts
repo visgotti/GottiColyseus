@@ -10,9 +10,11 @@ import * as http from 'http';
 export declare type ConnectorClient = WebSocket & {
     upgradeReq?: http.IncomingMessage;
     id: string;
+    gottiId: string;
     options: any;
     sessionId: string;
     pingCount: number;
     auth?: any;
+    seatOptions?: any;
     channelClient: ChannelClient;
 };

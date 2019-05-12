@@ -15,6 +15,8 @@ class AreaRoom extends events_1.EventEmitter {
         this.metadata = null;
         this.clientsById = {};
         this.gottiProcess = null;
+        this.writingClientIds = new Set();
+        this.listeningClientIds = new Set();
         this.gottiProcess = gottiProcess;
         this.publicOptions = publicOptions;
         this.areaId = areaId;
@@ -45,7 +47,7 @@ class AreaRoom extends events_1.EventEmitter {
             this.masterChannel.messageClient(clientId, [22 /* ADD_CLIENT_AREA_LISTEN */, areaId, options]);
         };
         this.gottiProcess.startAllSystems();
-        this.gottiProcess.startLoop(this.gameLoopRate);
+        this.gottiProcess.startLoop();
     }
     // dispatches local message to server systems from room
     addMessage(message) {
@@ -78,7 +80,6 @@ class AreaRoom extends events_1.EventEmitter {
      * @param message
      */
     dispatchToLocalClients(message) {
-        console.log('BROADCASTING LINKED!!!! WELL DOING DISPATCH TO LOCAL CLIENTS');
         this.areaChannel.broadcastLinked([28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from]);
     }
     /**
@@ -86,10 +87,10 @@ class AreaRoom extends events_1.EventEmitter {
      * @param client
      * @param message
      */
-    dispatchToClient(client, message) {
-        this.masterChannel.messageClient(client.id, [28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from]);
+    dispatchToClient(clientId, message) {
+        this.masterChannel.messageClient(clientId, [28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from]);
     }
-    dispatchToAreas(areaIds, message) {
+    dispatchToAreas(message, areaIds) {
         this.areaChannel.sendMainFront([34 /* AREA_TO_AREA_SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from, areaIds]);
     }
     _onConnectorMessage() { }
@@ -100,37 +101,57 @@ class AreaRoom extends events_1.EventEmitter {
     ;
     registerBackChannelMessages() {
         this.areaChannel.onMessage((message) => {
-            console.log('got message', message);
             if (message[0] === 26 /* AREA_DATA */) {
                 //    this.onMessage();
             }
             else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {
+                // [ protocol, type, data, to, fromSystem, fromAreaId]
+                this.gottiProcess.messageQueue.addAreaMessage(message[5], {
+                    type: message[1],
+                    data: message[2],
+                    to: message[3],
+                    from: message[4],
+                });
                 //  this.onMessage(message[1]);
             }
         });
         // get the add remote call reference from gottiProcess's message queue.
-        const messageQueueRemoteDispatch = this.gottiProcess.messageQueue.addRemote.bind(this.gottiProcess.messageQueue);
-        const messageQueueInstantRemoteDispatch = this.gottiProcess.messageQueue.instantDispatch.bind(this.gottiProcess.messageQueue);
+        const messageQueueClientDispatch = this.gottiProcess.messageQueue.addClientMessage.bind(this.gottiProcess.messageQueue);
+        const messageQueueInstantClientDispatch = this.gottiProcess.messageQueue.instantClientDispatch.bind(this.gottiProcess.messageQueue);
         const clientManager = this.gottiProcess.clientManager;
+        clientManager.listeningClientIds = this.listeningClientIds;
+        clientManager.writingClientIds = this.writingClientIds;
         this.areaChannel.onClientMessage((clientId, message) => {
             const protocol = message[0];
             if (protocol === 26 /* AREA_DATA */) {
                 //    this.onMessage();
             }
             else if (protocol === 28 /* SYSTEM_MESSAGE */) {
-                messageQueueRemoteDispatch(message[1], message[2], message[3], message[4]);
+                messageQueueClientDispatch(clientId, { type: message[1], data: message[2], to: message[3], from: message[4] });
             }
             else if (protocol === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
-                messageQueueInstantRemoteDispatch({ type: message[1], data: message[2], to: message[3], from: message[4] }, true);
+                messageQueueInstantClientDispatch(clientId, { type: message[1], data: message[2], to: message[3], from: message[4] });
             }
         });
         this.areaChannel.onAddClientListen((clientUid, options) => {
-            clientManager.onClientListen.bind(clientManager);
             return options || true;
         });
-        this.areaChannel.onAddClientWrite(clientManager.onClientWrite.bind(clientManager));
-        this.areaChannel.onRemoveClientWrite(clientManager.onClientRemoveWrite.bind(clientManager));
-        this.areaChannel.onRemoveClientListen(clientManager.onClientRemoveListen.bind(clientManager));
+        this.areaChannel.onAddedClientListener((clientId, options) => {
+            this.listeningClientIds.add(clientId);
+            clientManager.onClientListen(clientId, options);
+        });
+        this.areaChannel.onAddClientWrite((clientId, options) => {
+            this.writingClientIds.add(clientId);
+            clientManager.onClientWrite(clientId, options);
+        });
+        this.areaChannel.onRemoveClientWrite((clientId, options) => {
+            this.writingClientIds.delete(clientId);
+            clientManager.onClientRemoveWrite(clientId, options);
+        });
+        this.areaChannel.onRemoveClientListen((clientId, options) => {
+            this.listeningClientIds.delete(clientId);
+            clientManager.onClientRemoveListen();
+        });
     }
 }
 exports.AreaRoom = AreaRoom;

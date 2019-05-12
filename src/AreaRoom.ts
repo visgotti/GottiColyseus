@@ -45,6 +45,9 @@ export class AreaRoom extends EventEmitter {
     public state: any;
     private gottiProcess: any = null;
 
+    private writingClientIds: Set<any> = new Set();
+    private listeningClientIds: Set<any> = new Set();
+
     constructor(gottiProcess: any, areaId, publicOptions?: any) {
         super();
         this.gottiProcess = gottiProcess;
@@ -165,6 +168,9 @@ export class AreaRoom extends EventEmitter {
 
         const clientManager = this.gottiProcess.clientManager;
 
+        clientManager.listeningClientIds = this.listeningClientIds;
+        clientManager.writingClientIds = this.writingClientIds;
+
         this.areaChannel.onClientMessage((clientId, message) => {
             const protocol = message[0];
             if (protocol === Protocol.AREA_DATA) {
@@ -180,9 +186,21 @@ export class AreaRoom extends EventEmitter {
                 return options || true;
         });
 
-        this.areaChannel.onAddedClientListener(clientManager.onClientListen.bind(clientManager));
-        this.areaChannel.onAddClientWrite(clientManager.onClientWrite.bind(clientManager));
-        this.areaChannel.onRemoveClientWrite(clientManager.onClientRemoveWrite.bind(clientManager));
-        this.areaChannel.onRemoveClientListen(clientManager.onClientRemoveListen.bind(clientManager));
+        this.areaChannel.onAddedClientListener((clientId: any, options?: any) => {
+            this.listeningClientIds.add(clientId);
+            clientManager.onClientListen(clientId, options);
+        });
+        this.areaChannel.onAddClientWrite((clientId: any, options?: any) => {
+            this.writingClientIds.add(clientId);
+            clientManager.onClientWrite(clientId, options)
+        });
+        this.areaChannel.onRemoveClientWrite((clientId: any, options? : any) => {
+            this.writingClientIds.delete(clientId);
+            clientManager.onClientRemoveWrite(clientId, options);
+        });
+        this.areaChannel.onRemoveClientListen((clientId: any, options? : any) => {
+            this.listeningClientIds.delete(clientId);
+            clientManager.onClientRemoveListen()
+        });
     }
 }

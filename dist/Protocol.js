@@ -20,7 +20,6 @@ function decode(message) {
 }
 exports.decode = decode;
 function send(client, message, encode = true) {
-    console.log('attempting to send... message', message);
     if (client.readyState === WebSocket.OPEN) {
         client.send((encode && msgpack.encode(message)) || message, { binary: true });
     }
