@@ -73,7 +73,7 @@ export class Gate {
         return false;
     }
 
-    constructor(gateURI) {
+    constructor(gateURI, requestTimeout=5000) {
         this.gateKeep = this.gateKeep.bind(this);
         this.gameRequested = this.gameRequested.bind(this);
         this.requestBroker = new Broker(gateURI, 'gate');
@@ -81,10 +81,23 @@ export class Gate {
         this.requester = new Requester({
             id: 'gate_requester',
             brokerURI: gateURI,
-            request: { timeout: 1000 }
+            request: { timeout: requestTimeout }
         });
-        //TODO: initialize subscriber socket
+
+        //TODO: initialize subscriber socket for listening to connector
     }
+
+    private initializeGracefulShutdown() {
+        //todo send messages to connector servers to let it know gate is down?
+        function cleanup(sig) {
+            this.requestBroker.close();
+            this.requester.close();
+        }
+
+        process.on('SIGINT', cleanup.bind(null, 'SIGINT'));
+        process.on('SIGTERM', cleanup.bind(null, 'SIGTERM'));
+    }
+
 
     public defineMatchMaker(gameType, MatchMakerFunction) {
         if(!(this.availableGamesByType[gameType])) {
