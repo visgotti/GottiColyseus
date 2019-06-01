@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import { BackChannel, BackMaster } from 'gotti-channels/dist';
 import { EventEmitter } from 'events';
 import { AreaClient as Client } from './AreaClient';

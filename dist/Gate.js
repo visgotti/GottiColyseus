@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dist_1 = require("gotti-reqres/dist");
 const Util_1 = require("./Util");
 class Gate {
-    constructor(gateURI) {
+    constructor(gateURI, requestTimeout = 5000) {
         this.urls = [];
         this.connectorsByServerIndex = {};
         // used for reconnections
@@ -20,9 +20,9 @@ class Gate {
         this.requester = new dist_1.Messenger({
             id: 'gate_requester',
             brokerURI: gateURI,
-            request: { timeout: 1000 }
+            request: { timeout: requestTimeout }
         });
-        //TODO: initialize subscriber socket
+        //TODO: initialize subscriber socket for listening to connector
     }
     makeGameAvailable(gameId) {
         if (gameId in this.unavailableGamesById) {
@@ -40,6 +40,15 @@ class Gate {
             return true;
         }
         return false;
+    }
+    initializeGracefulShutdown() {
+        //todo send messages to connector servers to let it know gate is down?
+        function cleanup(sig) {
+            this.requestBroker.close();
+            this.requester.close();
+        }
+        process.on('SIGINT', cleanup.bind(null, 'SIGINT'));
+        process.on('SIGTERM', cleanup.bind(null, 'SIGTERM'));
     }
     defineMatchMaker(gameType, MatchMakerFunction) {
         if (!(this.availableGamesByType[gameType])) {

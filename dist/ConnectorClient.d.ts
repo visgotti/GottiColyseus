@@ -1,4 +1,3 @@
-/// <reference types="node" />
 /**
  * Connector Client is the same thing as the regular colyseus client and has all the same functionality
  * with the additional 'centrumClient' object and its methods to communicate with the centrum back channels

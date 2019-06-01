@@ -9,7 +9,6 @@
  *  modified to fit GottiColyseus by -
  *  https://github.com/visgotti
  ***************************************************************************************/
-/// <reference types="node" />
 import { ServerOptions as IServerOptions } from 'ws';
 import { FrontMaster } from 'gotti-channels/dist';
 import { EventEmitter } from 'events';
