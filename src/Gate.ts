@@ -1,5 +1,6 @@
 import { Messenger as Requester, Broker } from 'gotti-reqres/dist';
-import { GateProtocol } from './Protocol';
+import {BackChannel, BackMaster} from "gotti-channels/dist";
+import { GateProtocol, GOTTI_GATE_BACK_MASTER_SERVER_INDEX, GOTTI_GATE_CHANNEL_ID } from './Protocol';
 import { sortByProperty, generateId } from './Util';
 
 export interface ConnectorData {
@@ -48,11 +49,40 @@ export class Gate {
     private requestBroker: Broker;
     private requester: Requester;
 
+    private masterChannel: BackMaster = null;
+    private backChannel: BackChannel = null;
+
     private availableGamesByType: { [type: string]: {[id: string]: GameData } } = {};
     private unavailableGamesById: { [id: string]: GameData } = {};
     private matchMakersByGameType: Map<string, any> = new Map();
 
     private heartbeat: NodeJS.Timer = null;
+
+    constructor(gateURI, requestTimeout=5000) {
+        this.gateKeep = this.gateKeep.bind(this);
+        this.gameRequested = this.gameRequested.bind(this);
+        this.requestBroker = new Broker(gateURI, 'gate');
+
+        this.requester = new Requester({
+            id: 'gate_requester',
+            brokerURI: gateURI,
+            request: { timeout: requestTimeout }
+        });
+
+        this.masterChannel = new BackMaster(GOTTI_GATE_BACK_MASTER_SERVER_INDEX);
+        this.masterChannel.addChannels(GOTTI_GATE_CHANNEL_ID);
+        this.backChannel = this.masterChannel.backChannels[GOTTI_GATE_CHANNEL_ID];
+
+        //TODO: initialize subscriber socket for listening to connector
+    }
+
+    /**
+     * sends message to connector servers that can be handled with onGateMessage implementation
+     * @param message
+     */
+    public sendConnectors(message: any) {
+        this.backChannel.broadcast(message);
+    }
 
     private makeGameAvailable(gameId: string) : boolean {
         if(gameId in this.unavailableGamesById) {
@@ -73,31 +103,21 @@ export class Gate {
         return false;
     }
 
-    constructor(gateURI, requestTimeout=5000) {
-        this.gateKeep = this.gateKeep.bind(this);
-        this.gameRequested = this.gameRequested.bind(this);
-        this.requestBroker = new Broker(gateURI, 'gate');
-
-        this.requester = new Requester({
-            id: 'gate_requester',
-            brokerURI: gateURI,
-            request: { timeout: requestTimeout }
-        });
-
-        //TODO: initialize subscriber socket for listening to connector
-    }
-
     private initializeGracefulShutdown() {
         //todo send messages to connector servers to let it know gate is down?
         function cleanup(sig) {
             this.requestBroker.close();
             this.requester.close();
+            this.publisher.close();
         }
 
         process.on('SIGINT', cleanup.bind(null, 'SIGINT'));
         process.on('SIGTERM', cleanup.bind(null, 'SIGTERM'));
     }
 
+    public publishToConnectors() {
+
+    }
 
     public defineMatchMaker(gameType, MatchMakerFunction) {
         if(!(this.availableGamesByType[gameType])) {

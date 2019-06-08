@@ -21,9 +21,10 @@ import * as WebSocket from 'ws';
 import { ServerOptions as IServerOptions } from 'ws';
 
 import { Messenger as Responder } from 'gotti-reqres/dist';
+import { Messenger as Subscriber } from 'gotti-pubsub/dist';
 
-import { FrontMaster, Client as ChannelClient } from 'gotti-channels/dist';
-import { decode, Protocol, GateProtocol, send, WS_CLOSE_CONSENTED  } from './Protocol';
+import {FrontMaster, Client as ChannelClient, FrontChannel} from 'gotti-channels/dist';
+import { decode, Protocol, GateProtocol, send, WS_CLOSE_CONSENTED, GOTTI_GATE_CHANNEL_ID  } from './Protocol';
 
 import * as fossilDelta from 'fossil-delta';
 
@@ -98,15 +99,17 @@ export abstract class Connector extends EventEmitter {
 
     private server: any;
     private gateURI: string;
+
     private responder: Responder;
+
     private reservedSeats: {[clientId: string]: any} = {};
 
     private messageRelayRate: number; // 20 fps
 
     constructor(options: ConnectorOptions) {
         super();
-
-        this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE
+        this.gateURI = options.gateURI;
+        this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE;
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
         this.areaServerURIs = options.areaServerURIs;
@@ -174,7 +177,13 @@ export abstract class Connector extends EventEmitter {
 
     public async connectToAreas() : Promise<boolean> {
         this.masterChannel = new FrontMaster(this.serverIndex);
-        this.masterChannel.initialize(this.connectorURI, this.areaServerURIs);
+
+        const backChannelURIs = [...this.areaServerURIs, this.gateURI];
+        this.masterChannel.initialize(this.connectorURI, backChannelURIs);
+
+        const gateChannelId = GOTTI_GATE_CHANNEL_ID;
+        const channelIds = [...this.areaRoomIds, gateChannelId];
+
         this.masterChannel.addChannels(this.areaRoomIds);
         this.channels = this.masterChannel.frontChannels;
 
@@ -185,13 +194,11 @@ export abstract class Connector extends EventEmitter {
 
                     this.areaOptions = connection.backChannelOptions;
                     this.registerAreaMessages();
-
+                    this.registerGateMessages();
                     this.server = new WebSocket.Server(this.options);
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
-
                     this.startMessageRelay();
-
                     return resolve(true);
                 });
             }, 500);
@@ -203,6 +210,9 @@ export abstract class Connector extends EventEmitter {
 
     // Optional abstract methods
     public onInit?(options: any): void;
+
+    // triggered when sending message from gate using gate.sendConnector();
+    public onGateMessage?(message: any) : void;
 
     // hook that gets ran when a client successfully joins the reserved seat.
     public onJoin?(client: Client): any | Promise<any>;
@@ -311,8 +321,20 @@ export abstract class Connector extends EventEmitter {
         });
     }
 
+    private registerGateMessages() {
+        const gateChannel = this.masterChannel.frontChannels[GOTTI_GATE_CHANNEL_ID];
+        gateChannel.onMessage((message) => {
+            this.onGateMessage && this.onGateMessage(message);
+        });
+    }
+
     private registerAreaMessages() {
-        Object.keys(this.channels).forEach(channelId => {
+        const keys = Object.keys(this.channels);
+        for(let i = 0; i < keys.length; i++) {
+            const channelId = keys[i];
+            // dont want to register area messages on gate channel
+            if(channelId === GOTTI_GATE_CHANNEL_ID) continue;
+
             const channel = this.channels[channelId];
             channel.onMessage((message) => {
                 if(message[0] === Protocol.SYSTEM_MESSAGE || message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
@@ -332,6 +354,9 @@ export abstract class Connector extends EventEmitter {
                     channel.broadcast(message, toAreaIds)
                 }
             });
+        }
+        Object.keys(this.channels).forEach(channelId => {
+
         });
     }
 

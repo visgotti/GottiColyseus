@@ -58,6 +58,9 @@ export enum StateProtocol {
     PATCH = 1
 }
 
+export const GOTTI_GATE_CHANNEL_ID = 'gotti_gate';
+export const GOTTI_GATE_BACK_MASTER_SERVER_INDEX = 999999;
+
 export function decode(message: any) {
     try {
         message = msgpack.decode(Buffer.from(message));
