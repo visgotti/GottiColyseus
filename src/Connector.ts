@@ -24,7 +24,7 @@ import { Messenger as Responder } from 'gotti-reqres/dist';
 import { Messenger as Subscriber } from 'gotti-pubsub/dist';
 
 import {FrontMaster, Client as ChannelClient, FrontChannel} from 'gotti-channels/dist';
-import { decode, Protocol, GateProtocol, send, WS_CLOSE_CONSENTED, GOTTI_GATE_CHANNEL_ID  } from './Protocol';
+import { decode, Protocol, GateProtocol, send, WS_CLOSE_CONSENTED, GOTTI_MASTER_CHANNEL_ID  } from './Protocol';
 
 import * as fossilDelta from 'fossil-delta';
 
@@ -55,6 +55,7 @@ export type ConnectorOptions = IServerOptions & {
     serverIndex: number,
     connectorURI: string,
     gateURI: string,
+    masterURI?: string,
     areaRoomIds: Array<string>,
     areaServerURIs: Array<string>,
 };
@@ -99,6 +100,7 @@ export abstract class Connector extends EventEmitter {
 
     private server: any;
     private gateURI: string;
+    private masterURI: string;
 
     private responder: Responder;
 
@@ -177,12 +179,15 @@ export abstract class Connector extends EventEmitter {
 
     public async connectToAreas() : Promise<boolean> {
         this.masterChannel = new FrontMaster(this.serverIndex);
-
-        const backChannelURIs = [...this.areaServerURIs, this.gateURI];
+        let backChannelURIs = [...this.areaServerURIs];
+        let backChannelIds = [...this.areaRoomIds];
+        if(this.gateURI) {
+            backChannelURIs.push(this.gateURI);
+            backChannelIds.push(GOTTI_MASTER_CHANNEL_ID);
+        }
         this.masterChannel.initialize(this.connectorURI, backChannelURIs);
 
-        const gateChannelId = GOTTI_GATE_CHANNEL_ID;
-        const channelIds = [...this.areaRoomIds, gateChannelId];
+        const gateChannelId = GOTTI_MASTER_CHANNEL_ID;
 
         this.masterChannel.addChannels(this.areaRoomIds);
         this.channels = this.masterChannel.frontChannels;
@@ -191,10 +196,8 @@ export abstract class Connector extends EventEmitter {
         return new Promise((resolve, reject) => {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
-
                     this.areaOptions = connection.backChannelOptions;
                     this.registerAreaMessages();
-                    this.registerGateMessages();
                     this.server = new WebSocket.Server(this.options);
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
@@ -212,7 +215,7 @@ export abstract class Connector extends EventEmitter {
     public onInit?(options: any): void;
 
     // triggered when sending message from gate using gate.sendConnector();
-    public onGateMessage?(message: any) : void;
+    public onMasterMessage?(message: any) : void;
 
     // hook that gets ran when a client successfully joins the reserved seat.
     public onJoin?(client: Client): any | Promise<any>;
@@ -321,11 +324,13 @@ export abstract class Connector extends EventEmitter {
         });
     }
 
-    private registerGateMessages() {
-        const gateChannel = this.masterChannel.frontChannels[GOTTI_GATE_CHANNEL_ID];
-        gateChannel.onMessage((message) => {
-            this.onGateMessage && this.onGateMessage(message);
-        });
+    private registerMasterMessages() {
+        const masterChannel = this.masterChannel.frontChannels[GOTTI_MASTER_CHANNEL_ID];
+        if(masterChannel) {
+            masterChannel.onMessage((message) => {
+                this.onMasterMessage && this.onMasterMessage(message);
+            });
+        }
     }
 
     private registerAreaMessages() {
@@ -333,7 +338,7 @@ export abstract class Connector extends EventEmitter {
         for(let i = 0; i < keys.length; i++) {
             const channelId = keys[i];
             // dont want to register area messages on gate channel
-            if(channelId === GOTTI_GATE_CHANNEL_ID) continue;
+            if(channelId === GOTTI_MASTER_CHANNEL_ID) continue;
 
             const channel = this.channels[channelId];
             channel.onMessage((message) => {
@@ -355,9 +360,6 @@ export abstract class Connector extends EventEmitter {
                 }
             });
         }
-        Object.keys(this.channels).forEach(channelId => {
-
-        });
     }
 
     private async _getInitialWriteArea(client, clientOptions?: any) : Promise<boolean> {

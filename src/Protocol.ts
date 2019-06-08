@@ -58,8 +58,8 @@ export enum StateProtocol {
     PATCH = 1
 }
 
-export const GOTTI_GATE_CHANNEL_ID = 'gotti_gate';
-export const GOTTI_GATE_BACK_MASTER_SERVER_INDEX = 999999;
+export const GOTTI_MASTER_CHANNEL_ID = 'gotti_master';
+export const GOTTI_MASTER_SERVER_INDEX = 999999;
 
 export function decode(message: any) {
     try {
