@@ -53,6 +53,7 @@ class Connector extends events_1.EventEmitter {
             client.on('error', (err) => console.error(err.message + '\n' + err.stack));
             //send(client, [Protocol.USER_ID, client.gottiId])
         };
+        this.gateURI = options.gateURI;
         this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE;
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
@@ -95,7 +96,14 @@ class Connector extends events_1.EventEmitter {
     }
     async connectToAreas() {
         this.masterChannel = new dist_2.FrontMaster(this.serverIndex);
-        this.masterChannel.initialize(this.connectorURI, this.areaServerURIs);
+        let backChannelURIs = [...this.areaServerURIs];
+        let backChannelIds = [...this.areaRoomIds];
+        if (this.gateURI) {
+            backChannelURIs.push(this.gateURI);
+            backChannelIds.push(Protocol_1.GOTTI_MASTER_CHANNEL_ID);
+        }
+        this.masterChannel.initialize(this.connectorURI, backChannelURIs);
+        const gateChannelId = Protocol_1.GOTTI_MASTER_CHANNEL_ID;
         this.masterChannel.addChannels(this.areaRoomIds);
         this.channels = this.masterChannel.frontChannels;
         //TODO: right now you need to wait a bit after connecting and binding to uris will refactor channels eventually to fix this
@@ -197,8 +205,21 @@ class Connector extends events_1.EventEmitter {
             }
         });
     }
+    registerMasterMessages() {
+        const masterChannel = this.masterChannel.frontChannels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+        if (masterChannel) {
+            masterChannel.onMessage((message) => {
+                this.onMasterMessage && this.onMasterMessage(message);
+            });
+        }
+    }
     registerAreaMessages() {
-        Object.keys(this.channels).forEach(channelId => {
+        const keys = Object.keys(this.channels);
+        for (let i = 0; i < keys.length; i++) {
+            const channelId = keys[i];
+            // dont want to register area messages on gate channel
+            if (channelId === Protocol_1.GOTTI_MASTER_CHANNEL_ID)
+                continue;
             const channel = this.channels[channelId];
             channel.onMessage((message) => {
                 if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
@@ -219,7 +240,7 @@ class Connector extends events_1.EventEmitter {
                     channel.broadcast(message, toAreaIds);
                 }
             });
-        });
+        }
     }
     async _getInitialWriteArea(client, clientOptions) {
         const write = this.getInitialWriteArea(client, this.areaOptions, clientOptions);

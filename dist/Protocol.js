@@ -8,6 +8,8 @@ var StateProtocol;
     StateProtocol[StateProtocol["SET"] = 0] = "SET";
     StateProtocol[StateProtocol["PATCH"] = 1] = "PATCH";
 })(StateProtocol = exports.StateProtocol || (exports.StateProtocol = {}));
+exports.GOTTI_MASTER_CHANNEL_ID = 'gotti_master';
+exports.GOTTI_MASTER_SERVER_INDEX = 999999;
 function decode(message) {
     try {
         message = msgpack.decode(Buffer.from(message));

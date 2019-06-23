@@ -33,5 +33,7 @@ export declare enum StateProtocol {
     SET = 0,
     PATCH = 1
 }
+export declare const GOTTI_MASTER_CHANNEL_ID = "gotti_master";
+export declare const GOTTI_MASTER_SERVER_INDEX = 999999;
 export declare function decode(message: any): any;
 export declare function send(client: ConnectorClient, message: any, encode?: boolean): void;

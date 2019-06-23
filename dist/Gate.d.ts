@@ -43,8 +43,7 @@ export declare class Gate {
     private heartbeat;
     private makeGameAvailable;
     private makeGameUnavailable;
-    constructor(gateURI: any, requestTimeout?: number);
-    private initializeGracefulShutdown;
+    constructor(gateURI: any);
     defineMatchMaker(gameType: any, MatchMakerFunction: any): void;
     private createHeartbeatForConnector;
     private createReserveSeatForConnector;
