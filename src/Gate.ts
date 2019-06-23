@@ -150,7 +150,7 @@ export class Gate {
         });
 
         this.gamesById[gameId] = {
-            id: gameType,
+            id: gameId,
             type: gameType,
             connectorsData: gameConnectorsData,
             publicOptions,
