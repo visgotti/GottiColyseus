@@ -61,7 +61,7 @@ class Gate {
     async reserveSeat(connectorServerIndex, auth, seatOptions) {
         const tempId = Util_1.generateId();
         this.playerIndex++;
-        if (this.playerIndex > 65, 535) {
+        if (this.playerIndex > 65535) {
             this.playerIndex = 0;
         }
         const playerIndex = this.playerIndex;

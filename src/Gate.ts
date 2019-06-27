@@ -111,7 +111,7 @@ export class Gate {
         const tempId = generateId();
 
         this.playerIndex++;
-        if(this.playerIndex > 65,535) {
+        if(this.playerIndex > 65535) {
             this.playerIndex = 0;
         }
         const playerIndex = this.playerIndex;
