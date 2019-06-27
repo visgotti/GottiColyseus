@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 /***************************************************************************************
  *  Modified implementation of the original Room class in colyseus, most of the code
  *  is copied directly from the version of colyseus the project was started with to prevent
@@ -10,7 +11,7 @@
  *  modified to fit GottiColyseus by -
  *  https://github.com/visgotti
  ***************************************************************************************/
-Object.defineProperty(exports, "__esModule", { value: true });
+const msgpack = require('notepack.io');
 const http = require("http");
 const Util_1 = require("./Util");
 const parseURL = require("url-parse");
@@ -223,13 +224,15 @@ class Connector extends events_1.EventEmitter {
             const channel = this.channels[channelId];
             channel.onMessage((message) => {
                 if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
+                    // add from area id
                     // get all listening clients for area/channel
                     const listeningClientUids = channel.listeningClientUids;
                     let numClients = listeningClientUids.length;
                     // iterate through all and relay message
+                    message = msgpack.encode(message);
                     while (numClients--) {
                         const client = this.clientsById[listeningClientUids[numClients]];
-                        Protocol_1.send(client, message);
+                        Protocol_1.send(client, message, false);
                     }
                 }
                 else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {

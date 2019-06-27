@@ -9,6 +9,7 @@
  *  modified to fit GottiColyseus by -
  *  https://github.com/visgotti
  ***************************************************************************************/
+const msgpack = require('notepack.io');
 
 import * as net from 'net';
 import * as http from 'http';
@@ -343,13 +344,15 @@ export abstract class Connector extends EventEmitter {
             const channel = this.channels[channelId];
             channel.onMessage((message) => {
                 if(message[0] === Protocol.SYSTEM_MESSAGE || message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
+                    // add from area id
                     // get all listening clients for area/channel
                     const listeningClientUids = channel.listeningClientUids;
                     let numClients = listeningClientUids.length;
                     // iterate through all and relay message
+                    message =  msgpack.encode(message);
                     while (numClients--) {
                         const client = this.clientsById[ listeningClientUids[numClients] ];
-                        send(client, message);
+                        send(client, message, false);
                     }
                 } else if (message[0] === Protocol.AREA_TO_AREA_SYSTEM_MESSAGE) {
                     // [protocol, type, data, to, from, areaIds]

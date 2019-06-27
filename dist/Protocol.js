@@ -23,7 +23,7 @@ function decode(message) {
 exports.decode = decode;
 function send(client, message, encode = true) {
     if (client.readyState === WebSocket.OPEN) {
-        client.send((encode && msgpack.encode(message)) || message, { binary: true });
+        client.send((encode && msgpack.encode(message)) || message);
     }
 }
 exports.send = send;

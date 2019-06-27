@@ -1,14 +1,3 @@
-/***************************************************************************************
- *  Modified implementation of the original Room class in colyseus, most of the code
- *  is copied directly from the version of colyseus the project was started with to prevent
- *  breaking changes that would come from extending or implementing it directly.
- *
- *  Original code was written by-
- *  https://github.com/colyseus and https://github.com/endel
- *
- *  modified to fit GottiColyseus by -
- *  https://github.com/visgotti
- ***************************************************************************************/
 import { ServerOptions as IServerOptions } from 'ws';
 import { FrontMaster } from 'gotti-channels/dist';
 import { EventEmitter } from 'events';
