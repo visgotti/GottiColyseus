@@ -40,6 +40,7 @@ export declare class Gate {
     private availableGamesByType;
     private unavailableGamesById;
     private matchMakersByGameType;
+    private playerIndex;
     private heartbeat;
     private makeGameAvailable;
     private makeGameUnavailable;

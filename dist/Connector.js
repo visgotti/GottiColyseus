@@ -48,6 +48,7 @@ class Connector extends events_1.EventEmitter {
             }
             else {
                 client.gottiId = req.gottiId;
+                client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
                 this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
             }
             // prevent server crashes if a single client had unexpected error
@@ -369,9 +370,10 @@ class Connector extends events_1.EventEmitter {
      * @param seatOptions - additional data sent from the gate
      * @private
      */
-    _reserveSeat(clientId, auth, seatOptions) {
+    _reserveSeat(clientId, playerIndex, auth, seatOptions) {
         this.reservedSeats[clientId] = {
             auth,
+            playerIndex,
             seatOptions,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
@@ -385,13 +387,14 @@ class Connector extends events_1.EventEmitter {
      * @private
      */
     _requestJoin(data) {
+        const playerIndex = data.playerIndex;
         const auth = data && data.auth ? data.auth : {};
         const seatOptions = data && data.seatOptions ? data.seatOptions : {};
         if (this.requestJoin(auth, seatOptions)) {
             const gottiId = Util_1.generateId();
-            this._reserveSeat(gottiId, auth, seatOptions);
+            this._reserveSeat(gottiId, playerIndex, auth, seatOptions);
             // todo send host n port
-            return { serverIndex: this.port, gottiId };
+            return { gottiId };
         }
         else {
             return false;

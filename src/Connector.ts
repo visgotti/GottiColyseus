@@ -170,6 +170,7 @@ export abstract class Connector extends EventEmitter {
             send(client, [Protocol.JOIN_CONNECTOR_ERROR])
         } else {
             client.gottiId = req.gottiId;
+            client.playerIndex = this.reservedSeats[req.gottiId].playerIndex
             this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
         }
 
@@ -504,9 +505,10 @@ export abstract class Connector extends EventEmitter {
      * @param seatOptions - additional data sent from the gate
      * @private
      */
-    private _reserveSeat(clientId, auth, seatOptions) {
+    private _reserveSeat(clientId, playerIndex, auth, seatOptions) {
         this.reservedSeats[clientId] = {
             auth,
+            playerIndex,
             seatOptions,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
@@ -521,15 +523,16 @@ export abstract class Connector extends EventEmitter {
      * @private
      */
     private _requestJoin(data) {
+        const playerIndex= data.playerIndex;
         const auth = data && data.auth ? data.auth : {};
         const seatOptions = data && data.seatOptions ? data.seatOptions : {};
 
         if(this.requestJoin(auth, seatOptions)) {
             const gottiId = generateId();
 
-            this._reserveSeat(gottiId, auth, seatOptions);
+            this._reserveSeat(gottiId, playerIndex, auth, seatOptions);
             // todo send host n port
-            return { serverIndex: this.port, gottiId } ;
+            return { gottiId } ;
         } else {
             return false;
         }
