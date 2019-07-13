@@ -73,6 +73,9 @@ export interface BroadcastOptions {
 
 export abstract class Connector extends EventEmitter {
     protected httpServer: any;
+
+    private signalChannel?: FrontChannel;
+
     public areaOptions: {[areaId: string]: any};
 
     public options: ConnectorOptions;
@@ -94,7 +97,7 @@ export abstract class Connector extends EventEmitter {
     public channels: any;
 
     public clients: Client[] = [];
-    public clientsById: {[sessionId: string]: Client} = {};
+    public clientsById: {[gottiId: string]: Client} = {};
 
     private _patchInterval: NodeJS.Timer;
     private _relayMessageTimeout: NodeJS.Timer;
@@ -305,6 +308,13 @@ export abstract class Connector extends EventEmitter {
     }
     */
 
+    private handleP2PRequest(fromClient: Client, reqSdpDesc: any, playerIndex: number) {
+        let len = this.clients.length;
+        while(len--) {
+
+        }
+    }
+
     private registerClientAreaMessageHandling(client) {
         client.channelClient.onMessage((message) => {
             if(message[0] === Protocol.SYSTEM_MESSAGE || message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
@@ -378,6 +388,34 @@ export abstract class Connector extends EventEmitter {
         }
     }
 
+    private _onSignalMessage(message: any) {
+        const protocol = message[0];
+
+        if(protocol === Protocol.ENABLED_CLIENT_P2P_SUCCESS) {
+            const client = this.clientsById[message[1]];
+            if(client) {
+                client.p2p = true;
+                send(this.clientsById[message[1]], [Protocol.ENABLED_CLIENT_P2P_SUCCESS]);
+            }
+        } else if(protocol === Protocol.REQUEST_PEER_CONNECTION_SUCCEEDED) {
+            // [gottiId, sdp, ice];
+            const clientData1 = message[1];
+            //  [gottiId, sdp, ice];
+            const clientData2 = message[2];
+
+            const client1 = this.clientsById[clientData1[0]];
+            const client2 = this.clientsById[clientData1[0]];
+
+            // sends the sdp and ice to other client of client
+            if(client1) {
+                send(client1, [protocol, clientData2[1], clientData2[2]]);
+            }
+            if(client2) {
+                send(client2, [protocol, clientData1[1], clientData1[2]]);
+            }
+        }
+    }
+
     private _onWebClientMessage(client: Client, message: any) {
         message = decode(message);
         if (!message) {
@@ -399,6 +437,20 @@ export abstract class Connector extends EventEmitter {
 
             // only effectively close connection when "onLeave" is fulfilled
             this._onLeave(client, WS_CLOSE_CONSENTED).then(() => client.close());
+        } else if(message[0] === Protocol.ENABLED_CLIENT_P2P) {
+            if(this.signalChannel) {
+                // [sdp, ice]
+                this.signalChannel.send([Protocol.ENABLED_CLIENT_P2P, this.signalChannel.frontUid, client.playerIndex, client.gottiId, message[1], message[2]])
+            }
+        } else if(message[0] === Protocol.DISABLED_CLIENT_P2P) {
+            if(this.signalChannel && client.p2p) {
+                // [sdp, ice]
+                this.signalChannel.send([Protocol.DISABLED_CLIENT_P2P, this.signalChannel.frontUid, client.playerIndex]);
+            }
+        } else if(message[0] === Protocol.REQUEST_PEER_CONNECTION) {
+            if(this.signalChannel) {
+                this.signalChannel.send([Protocol.REQUEST_PEER_CONNECTION, this.signalChannel.frontUid, client.playerIndex]);
+            }
         }
     }
 
@@ -485,8 +537,12 @@ export abstract class Connector extends EventEmitter {
 
     private async _onLeave(client: Client, code?: number): Promise<any> {
         // call abstract 'onLeave' method only if the client has been successfully accepted.
+        if(this.signalChannel && client.p2p) {
+            this.signalChannel.send([Protocol.DISABLED_CLIENT_P2P, this.signalChannel.frontUid, client.playerIndex]);
+        }
+
         if (spliceOne(this.clients, this.clients.indexOf(client))) {
-            delete this.clientsById[client.sessionId];
+            delete this.clientsById[client.gottiId];
             // disconnect gotti client too.
             client.channelClient.unlinkChannel();
             //TODO: notify gate server

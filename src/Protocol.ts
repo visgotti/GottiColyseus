@@ -5,6 +5,8 @@ import * as WebSocket from 'ws';
 import { ConnectorClient } from './ConnectorClient';
 export const WS_CLOSE_CONSENTED = 4000;
 
+export const SIGNAL_SERVER_ID = '__GOTTI_SIGNAL_SERVER__'
+
 export const enum Protocol {
     // find connector related (1~9)
     CONNECTOR_URI = 2,
@@ -41,6 +43,26 @@ export const enum Protocol {
         // Generic messages (50~60)
     BAD_REQUEST = 50,
 
+    // P2P/WEBRTC Codes
+    ENABLED_CLIENT_P2P = 100,
+    ENABLED_CLIENT_P2P_SUCCESS = 101,
+    DISABLED_CLIENT_P2P = 102,
+    REQUEST_PEER_CONNECTION = 103,
+    REQUEST_PEER_CONNECTION_FAILED,
+    REQUEST_PEER_CONNECTION_SUCCEEDED,
+    RESPONSE_TO_PEER_CONNECTION_REQUEST,
+    REQUEST_PEER_DISCONNECT,
+
+    SEND_PEER_CONNECTION_DATA,
+    SEND_PEER_MESSAGE,
+
+    BROADCAST_PEER_MESSAGE,
+
+    FAILED_SEND_PEER_MESSAGE,
+    FAILED_BROADCAST_PEER_MESSAGE,
+
+    ADDED_P2P,
+    REMOVED_P2P,
 
         // WebSocket error codes
     WS_SERVER_DISCONNECT = 4201,
