@@ -8,6 +8,8 @@ var StateProtocol;
     StateProtocol[StateProtocol["SET"] = 0] = "SET";
     StateProtocol[StateProtocol["PATCH"] = 1] = "PATCH";
 })(StateProtocol = exports.StateProtocol || (exports.StateProtocol = {}));
+exports.GOTTI_MASTER_CHANNEL_ID = 'gotti_master';
+exports.GOTTI_MASTER_SERVER_INDEX = 999999;
 function decode(message) {
     try {
         message = msgpack.decode(Buffer.from(message));
@@ -21,7 +23,7 @@ function decode(message) {
 exports.decode = decode;
 function send(client, message, encode = true) {
     if (client.readyState === WebSocket.OPEN) {
-        client.send((encode && msgpack.encode(message)) || message, { binary: true });
+        client.send((encode && msgpack.encode(message)) || message);
     }
 }
 exports.send = send;

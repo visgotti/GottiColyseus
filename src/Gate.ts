@@ -52,6 +52,8 @@ export class Gate {
     private unavailableGamesById: { [id: string]: GameData } = {};
     private matchMakersByGameType: Map<string, any> = new Map();
 
+    private playerIndex: number = 0;
+
     private heartbeat: NodeJS.Timer = null;
 
     private makeGameAvailable(gameId: string) : boolean {
@@ -107,12 +109,17 @@ export class Gate {
 
     private async reserveSeat(connectorServerIndex, auth, seatOptions): Promise<any> {
         const tempId = generateId();
+
+        this.playerIndex++;
+        if(this.playerIndex > 65535) {
+            this.playerIndex = 0;
+        }
+        const playerIndex = this.playerIndex;
+
         try {
             this.pendingClients[tempId] = auth;
 
-            console.log('the reserve seat function was', this.connectorsByServerIndex[connectorServerIndex].reserveSeat)
-
-            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, seatOptions });
+            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, seatOptions });
             console.log('the result was', result);
             if(result && result.gottiId) {
                 this.pendingClients.delete(tempId);
@@ -120,6 +127,7 @@ export class Gate {
                 const { host, port } = this.connectorsByServerIndex[connectorServerIndex];
                 return {
                     gottiId: result.gottiId,
+                    playerIndex,
                     host,
                     port,
                 }

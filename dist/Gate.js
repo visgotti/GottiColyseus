@@ -13,6 +13,7 @@ class Gate {
         this.availableGamesByType = {};
         this.unavailableGamesById = {};
         this.matchMakersByGameType = new Map();
+        this.playerIndex = 0;
         this.heartbeat = null;
         this.gateKeep = this.gateKeep.bind(this);
         this.gameRequested = this.gameRequested.bind(this);
@@ -59,10 +60,14 @@ class Gate {
     }
     async reserveSeat(connectorServerIndex, auth, seatOptions) {
         const tempId = Util_1.generateId();
+        this.playerIndex++;
+        if (this.playerIndex > 65535) {
+            this.playerIndex = 0;
+        }
+        const playerIndex = this.playerIndex;
         try {
             this.pendingClients[tempId] = auth;
-            console.log('the reserve seat function was', this.connectorsByServerIndex[connectorServerIndex].reserveSeat);
-            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, seatOptions });
+            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, seatOptions });
             console.log('the result was', result);
             if (result && result.gottiId) {
                 this.pendingClients.delete(tempId);
@@ -70,6 +75,7 @@ class Gate {
                 const { host, port } = this.connectorsByServerIndex[connectorServerIndex];
                 return {
                     gottiId: result.gottiId,
+                    playerIndex,
                     host,
                     port,
                 };
@@ -96,7 +102,7 @@ class Gate {
             gameConnectorsData.push(this.addConnector(host, port, serverIndex, gameId));
         });
         this.gamesById[gameId] = {
-            id: gameType,
+            id: gameId,
             type: gameType,
             connectorsData: gameConnectorsData,
             publicOptions,

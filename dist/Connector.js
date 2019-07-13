@@ -1,4 +1,5 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 /***************************************************************************************
  *  Modified implementation of the original Room class in colyseus, most of the code
  *  is copied directly from the version of colyseus the project was started with to prevent
@@ -10,7 +11,7 @@
  *  modified to fit GottiColyseus by -
  *  https://github.com/visgotti
  ***************************************************************************************/
-Object.defineProperty(exports, "__esModule", { value: true });
+const msgpack = require('notepack.io');
 const http = require("http");
 const Util_1 = require("./Util");
 const parseURL = require("url-parse");
@@ -47,12 +48,14 @@ class Connector extends events_1.EventEmitter {
             }
             else {
                 client.gottiId = req.gottiId;
+                client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
                 this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
             }
             // prevent server crashes if a single client had unexpected error
             client.on('error', (err) => console.error(err.message + '\n' + err.stack));
             //send(client, [Protocol.USER_ID, client.gottiId])
         };
+        this.gateURI = options.gateURI;
         this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE;
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
@@ -95,7 +98,14 @@ class Connector extends events_1.EventEmitter {
     }
     async connectToAreas() {
         this.masterChannel = new dist_2.FrontMaster(this.serverIndex);
-        this.masterChannel.initialize(this.connectorURI, this.areaServerURIs);
+        let backChannelURIs = [...this.areaServerURIs];
+        let backChannelIds = [...this.areaRoomIds];
+        if (this.gateURI) {
+            backChannelURIs.push(this.gateURI);
+            backChannelIds.push(Protocol_1.GOTTI_MASTER_CHANNEL_ID);
+        }
+        this.masterChannel.initialize(this.connectorURI, backChannelURIs);
+        const gateChannelId = Protocol_1.GOTTI_MASTER_CHANNEL_ID;
         this.masterChannel.addChannels(this.areaRoomIds);
         this.channels = this.masterChannel.frontChannels;
         //TODO: right now you need to wait a bit after connecting and binding to uris will refactor channels eventually to fix this
@@ -197,18 +207,33 @@ class Connector extends events_1.EventEmitter {
             }
         });
     }
+    registerMasterMessages() {
+        const masterChannel = this.masterChannel.frontChannels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+        if (masterChannel) {
+            masterChannel.onMessage((message) => {
+                this.onMasterMessage && this.onMasterMessage(message);
+            });
+        }
+    }
     registerAreaMessages() {
-        Object.keys(this.channels).forEach(channelId => {
+        const keys = Object.keys(this.channels);
+        for (let i = 0; i < keys.length; i++) {
+            const channelId = keys[i];
+            // dont want to register area messages on gate channel
+            if (channelId === Protocol_1.GOTTI_MASTER_CHANNEL_ID)
+                continue;
             const channel = this.channels[channelId];
             channel.onMessage((message) => {
                 if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
+                    // add from area id
                     // get all listening clients for area/channel
                     const listeningClientUids = channel.listeningClientUids;
                     let numClients = listeningClientUids.length;
                     // iterate through all and relay message
+                    message = msgpack.encode(message);
                     while (numClients--) {
                         const client = this.clientsById[listeningClientUids[numClients]];
-                        Protocol_1.send(client, message);
+                        Protocol_1.send(client, message, false);
                     }
                 }
                 else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {
@@ -219,7 +244,7 @@ class Connector extends events_1.EventEmitter {
                     channel.broadcast(message, toAreaIds);
                 }
             });
-        });
+        }
     }
     async _getInitialWriteArea(client, clientOptions) {
         const write = this.getInitialWriteArea(client, this.areaOptions, clientOptions);
@@ -345,9 +370,10 @@ class Connector extends events_1.EventEmitter {
      * @param seatOptions - additional data sent from the gate
      * @private
      */
-    _reserveSeat(clientId, auth, seatOptions) {
+    _reserveSeat(clientId, playerIndex, auth, seatOptions) {
         this.reservedSeats[clientId] = {
             auth,
+            playerIndex,
             seatOptions,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
@@ -361,13 +387,14 @@ class Connector extends events_1.EventEmitter {
      * @private
      */
     _requestJoin(data) {
+        const playerIndex = data.playerIndex;
         const auth = data && data.auth ? data.auth : {};
         const seatOptions = data && data.seatOptions ? data.seatOptions : {};
         if (this.requestJoin(auth, seatOptions)) {
             const gottiId = Util_1.generateId();
-            this._reserveSeat(gottiId, auth, seatOptions);
+            this._reserveSeat(gottiId, playerIndex, auth, seatOptions);
             // todo send host n port
-            return { serverIndex: this.port, gottiId };
+            return { gottiId };
         }
         else {
             return false;

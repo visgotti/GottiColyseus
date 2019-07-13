@@ -1,171 +1,69 @@
-import  { Config, AreaServer  } from './';
-import { fork } from 'child_process';
-import * as path from 'path';
-// import { Connector, Area, Gate } from './Processes';
+import { Messenger as Requester, Broker } from 'gotti-reqres/dist';
+import {BackChannel, BackMaster} from "gotti-channels/dist";
+import { GateProtocol, GOTTI_MASTER_CHANNEL_ID, GOTTI_MASTER_SERVER_INDEX } from './Protocol';
+import { sortByProperty, generateId } from './Util';
 
-interface ServerData {
-    serverIndex: number ,
-    URL: string
+export interface ConnectorData {
+    host: string,
+    port: number,
+    serverIndex: number,
 }
 
-export class MasterServer  {
+export interface MasterConfig {
+    masterURI: string,
+    connectorsData: Array<ConnectorData>,
+}
 
-    private availableConnectorServers: Array <ServerData>;
-    private availableAreaServers: Array<ServerData>;
+export class MasterServer {
+    private connectorsByServerIndex: { [serverIndex: number]: ConnectorData } = {};
+    private masterChannel: BackMaster = null;
+    private backChannel: BackChannel = null;
 
-    private gameConfigs: any = {};
-    private gamesInProgress: any = {};
-
-    private gateURI: string;
-
-    private gameId: number = 0;
-
-
-    private formattedConnectorOptions: any = {};
-    private formattedAreaServerOptions: any = {};
-    private formattedGateOptions: any = {};
-
-    constructor(config) {
-        let serverIndex = 0;
-
-        this.gateURI = config.gate_server;
-
-        this.availableConnectorServers= config.connector_servers.map(URL => {
-            return {
-                URL,
-                serverIndex: serverIndex++
-            }
-        });
-
-        this.availableAreaServers= config.area_servers.map(URL => {
-            return {
-                URL,
-                serverIndex: serverIndex++
-            }
-        });
-
-        this.gameConfigs = config.games;
-        this.gamesInProgress = {};
-    }
-
-    public startArea(areaConfig) {
-        const area = new AreaServer(areaConfig);
-        return area;
+    constructor() {
+        this.masterChannel = new BackMaster(GOTTI_MASTER_SERVER_INDEX);
+        this.masterChannel.addChannels(GOTTI_MASTER_CHANNEL_ID);
+        this.backChannel = this.masterChannel.backChannels[GOTTI_MASTER_CHANNEL_ID];
     }
 
     /**
-     * Takes original config file
-     * and creates config options for each
-     * room based on state of servers and original config.
-     * @param gameType
-     * @returns {{gateConfig: {}, areaConfigs: Array, connectorsConfig: Array}}
+     * sends message to connector servers that can be handled with onGateMessage implementation
+     * @param message
      */
-    public initializeConfigs(gameType) {
-        const connectorsConfig = [];
-        const areaConfigs = [];
+    public sendConnectors(message: any) {
+        this.backChannel.broadcast(message);
+    }
 
-        const game = this.gameConfigs[gameType];
-        if(!(game)) {
-            throw 'invalid game type';
+    private initializeGracefulShutdown() {
+        //todo send messages to connector servers to let it know gate is down?
+        function cleanup(sig) {
+            this.masterChannel.close();
         }
 
-        console.log('game was', game);
+        process.on('SIGINT', cleanup.bind(null, 'SIGINT'));
+        process.on('SIGTERM', cleanup.bind(null, 'SIGTERM'));
+    }
 
-        const connectorsCount = game.connectorCount;
-        if(connectorsCount > this.availableConnectorServers.length) {
-            throw 'not enough connectors available to start game'
-        }
-
-        const areaServersCount = game.areaServers.length;
-        if(areaServersCount > this.availableAreaServers) {
-            throw 'not enough areas available to start game'
-        }
-        let connectorServersToUse = [];
-        for(let i = 0; i < connectorsCount; i++) {
-            connectorServersToUse.push(this.availableConnectorServers.pop())
-        }
-
-        let areaServersToUse = [];
-        for(let i = 0; i < areaServersCount; i++) {
-            areaServersToUse.push(this.availableAreaServers.pop())
-        }
-
-        let connectorURIs = connectorServersToUse.map(c => {
-            return c.URL;
-        });
-
-        let areaURIs = areaServersToUse.map(a => {
-            return a.URL;
-        });
-
-        let areaRoomIds = [];
-        for(let i = 0; i < game.areaServers.length; i++) {
-            const { serverIndex, URL } = areaServersToUse[i];
-            areaConfigs.push({
-                serverIndex,
-                areaURI: URL,
-                areas: [],
-                connectorURIs: [...connectorURIs],
-            });
-            for(let j = 0; j < game.areaServers[i].areaRooms.length; j++) {
-                areaRoomIds.push(game.areaServers[i].areaRooms[j].id);
-                areaConfigs[areaConfigs.length - 1].areas.push(game.areaServers[i].areaRooms[j])
-            }
-        }
-
-        for(let i = 0; i < game.connectorCount; i++) {
-            const { serverIndex, URL } = connectorServersToUse[i];
-
-            let options: any = {
-                gateURI: this.gateURI,
-                serverIndex,
-                areaRoomIds,
-                areaServerURIs: areaURIs,
-                connectorURI: connectorURIs[i],
-            };
-
-            if(game.port) {
-                options.port = game.port;
-            }
-            if(game.pingTimeout) {
-                options.pingTimeout = game.pingTimeout
-            }
-            connectorsConfig.push(options);
-        }
-
-        let formattedConnectorData = [];
-        while(formattedConnectorData.length < connectorsCount) {
-            const { serverIndex, URL } = connectorServersToUse[formattedConnectorData.length];
-            formattedConnectorData.push({
-                URL,
-                serverIndex,
-                connectedClients: 0,
-                gameId: this.gameId,
-            })
-        }
-
-        const gateGameConfig = {
-            connectorsData: formattedConnectorData,
-            id: this.gameId,
-            type: gameType,
+    private addConnector(host, port, serverIndex, gameId): ConnectorData {
+        const formatError = () => {
+            return `error when adding connector SERVER_INDEX#: ${serverIndex}, host: ${host}, port: ${port} game ID:${gameId}`;
         };
 
-        return {
-            gateGameConfig,
-            areaConfigs,
-            connectorsConfig
+        if (serverIndex in this.connectorsByServerIndex) {
+            throw new Error(`${formatError()} because server index is already in connectors`);
         }
-    }
 
-    private formatDataForAreaServers() {
-    }
+        for (let serverIndex in this.connectorsByServerIndex) {
+            if (this.connectorsByServerIndex[serverIndex].host === host && this.connectorsByServerIndex[serverIndex].port === port) {
+                throw new Error(`${formatError()} because another connector already has the host and port`);
+            }
+        }
 
-    private formatDataForConnectorServers() {
-    }
+        this.connectorsByServerIndex[serverIndex] = {
+            host,
+            port,
+            serverIndex,
+        };
 
-    private formatDataForGateServer() {
-    }
-
-    public startGameRemotely(gameType) {
+        return this.connectorsByServerIndex[serverIndex];
     }
 }

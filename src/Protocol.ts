@@ -58,6 +58,9 @@ export enum StateProtocol {
     PATCH = 1
 }
 
+export const GOTTI_MASTER_CHANNEL_ID = 'gotti_master';
+export const GOTTI_MASTER_SERVER_INDEX = 999999;
+
 export function decode(message: any) {
     try {
         message = msgpack.decode(Buffer.from(message));
@@ -72,6 +75,6 @@ export function decode(message: any) {
 
 export function send(client: ConnectorClient, message: any, encode: boolean = true) {
     if (client.readyState === WebSocket.OPEN) {
-        client.send((encode && msgpack.encode(message)) || message, { binary: true });
+        client.send((encode && msgpack.encode(message)) || message);
     }
 }
