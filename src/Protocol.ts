@@ -5,7 +5,6 @@ import * as WebSocket from 'ws';
 import { ConnectorClient } from './ConnectorClient';
 export const WS_CLOSE_CONSENTED = 4000;
 
-export const SIGNAL_SERVER_ID = '__GOTTI_SIGNAL_SERVER__'
 
 export const enum Protocol {
     // find connector related (1~9)
@@ -44,12 +43,24 @@ export const enum Protocol {
     BAD_REQUEST = 50,
 
     // P2P/WEBRTC Codes
-    ENABLED_CLIENT_P2P = 100,
+    CLIENT_WEB_RTC_ENABLED = 100,
     ENABLED_CLIENT_P2P_SUCCESS = 101,
     DISABLED_CLIENT_P2P = 102,
-    REQUEST_PEER_CONNECTION = 103,
-    REQUEST_PEER_CONNECTION_FAILED,
-    REQUEST_PEER_CONNECTION_SUCCEEDED,
+    OFFER_PEER_CONNECTION = 103,
+    OFFER_PEER_CONNECTION_SUCCEEDED = 104,
+    OFFER_PEER_CONNECTION_FAILED = 105,
+
+    ANSWER_PEER_CONNECTION = 106,
+    ANSWER_PEER_CONNECTION_SUCCEEDED = 107,
+    ANSWER_PEER_CONNECTION_FAILED = 108,
+
+    SIGNAL_REQUEST= 111,
+    SIGNAL_SUCCESS= 112,
+    SIGNAL_FAILED=113,
+
+    PEER_REMOTE_SYSTEM_MESSAGE = 109,
+    PEERS_REMOTE_SYSTEM_MESSAGE = 110,
+
     RESPONSE_TO_PEER_CONNECTION_REQUEST,
     REQUEST_PEER_DISCONNECT,
 
@@ -80,8 +91,11 @@ export enum StateProtocol {
     PATCH = 1
 }
 
-export const GOTTI_MASTER_CHANNEL_ID = 'gotti_master';
-export const GOTTI_MASTER_SERVER_INDEX = 999999;
+export const GOTTI_MASTER_CHANNEL_ID = '__GOTTI_MASTER_CHANNEL__';
+export const GOTTI_MASTER_SERVER_INDEX = 55555;
+
+export const GOTTI_RELAY_CHANNEL_ID = '__GOTTI_RELAY_CHANNEL__';
+export const GOTTI_RELAY_SERVER_INDEX = 55556;
 
 export function decode(message: any) {
     try {

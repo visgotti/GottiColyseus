@@ -15,6 +15,7 @@ export declare type ConnectorOptions = IServerOptions & {
     masterURI?: string;
     areaRoomIds: Array<string>;
     areaServerURIs: Array<string>;
+    relayServerURI?: string;
 };
 export interface RoomAvailable {
     clients: number;
@@ -26,6 +27,7 @@ export interface BroadcastOptions {
 }
 export declare abstract class Connector extends EventEmitter {
     protected httpServer: any;
+    private relayChannel?;
     areaOptions: {
         [areaId: string]: any;
     };
@@ -45,13 +47,14 @@ export declare abstract class Connector extends EventEmitter {
     channels: any;
     clients: Client[];
     clientsById: {
-        [sessionId: string]: Client;
+        [gottiId: string]: Client;
     };
     private _patchInterval;
     private _relayMessageTimeout;
     private server;
     private gateURI;
     private masterURI;
+    private relayURI;
     private responder;
     private reservedSeats;
     private messageRelayRate;
@@ -93,7 +96,9 @@ export declare abstract class Connector extends EventEmitter {
     };
     protected broadcast(data: any, options?: BroadcastOptions): boolean;
     private registerClientAreaMessageHandling;
-    private registerMasterMessages;
+    private registerChannelMessages;
+    private registerMasterServerMessages;
+    private registerRelayMessages;
     private registerAreaMessages;
     private _getInitialWriteArea;
     private _onWebClientMessage;
