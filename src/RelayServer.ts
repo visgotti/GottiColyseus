@@ -18,7 +18,7 @@ export type RelayServerOptions = {
     relayURI: string;
 }
 
-class RelayServer {
+export class RelayServer {
     public masterChannel: BackMaster = null;
     private channel: BackChannel = null;
 

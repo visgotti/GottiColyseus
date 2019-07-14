@@ -112,3 +112,4 @@ class RelayServer {
         }
     }
 }
+exports.RelayServer = RelayServer;
