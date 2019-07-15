@@ -9,7 +9,7 @@ import {Protocol, GOTTI_RELAY_SERVER_INDEX, GOTTI_RELAY_CHANNEL_ID} from "./Prot
 export type PlayerData = {
     gottiId: string,
     connectorId: string,
-    p2p?: boolean,
+    p2p: boolean,
 }
 
 export type RelayServerOptions = {
@@ -63,11 +63,13 @@ export class RelayServer {
                     }
                 }
             } else if(protocol === Protocol.JOIN_CONNECTOR) {
-                console.log('RelayServer handling JOIN_CONNECTOR, playerIndex was', message[1], 'gottiId was', message[2], 'connectorId was', message[3]);
-                this.clientMap[message[1]] = {
-                    gottiId: message[2],
-                    connectorId: message[3],
+                console.log('RelayServer handling JOIN_CONNECTOR, p2p_capapable was:', message[1], 'playerIndex was', message[2], 'gottiId was', message[3], 'connectorId was', message[4]);
+                this.clientMap[message[2]] = {
+                    p2p: message[1],
+                    gottiId: message[3],
+                    connectorId: message[4],
                 }
+                this.p2pConnectionMap[message[2]] = [];
             } else if(protocol === Protocol.LEAVE_CONNECTOR) {
                 const clientData = this.clientMap[message[1]];
                 if(clientData) {
@@ -75,13 +77,14 @@ export class RelayServer {
                         this.handleRemovePlayerConnections(message[1])
                     }
                     delete this.clientMap[message[1]];
+                    delete this.p2pConnectionMap[message[1]];
                 }
             } else if(protocol === Protocol.PEER_REMOTE_SYSTEM_MESSAGE) {
-                //Protocol.PEER_REMOTE_SYSTEM_MESSAGE, peerIndex, message.type, message.data, message.to, message.from, playerIndex]);
+                //[Protocol.PEER_REMOTE_SYSTEM_MESSAGE, peerIndex, message.type, message.data, message.to, message.from, playerIndex];
                 const clientData = this.clientMap[message[1]];
                 if(clientData) {
                     console.log('GOT PEER REMOTE SYSTEM MESSAGE ON RELAY SERVER');
-                    //Protocol.PEER_REMOTE_SYSTEM_MESSAGE, toGottiId, fromPlayerIndex message.type, message.data, message.to, message.from, playerIndex]);
+                    //]Protocol.PEER_REMOTE_SYSTEM_MESSAGE, toGottiId, fromPlayerIndex, type, data, toSystems, fromSystem ]);
                     this.channel.send([protocol, clientData.gottiId, message[6], message[2], message[3], message[4], message[5]], clientData.connectorId);
                 }
             }

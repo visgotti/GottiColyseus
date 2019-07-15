@@ -2,7 +2,7 @@ import { BackMaster } from 'gotti-channels/dist';
 export declare type PlayerData = {
     gottiId: string;
     connectorId: string;
-    p2p?: boolean;
+    p2p: boolean;
 };
 export declare type RelayServerOptions = {
     connectorURIs: Array<string>;
