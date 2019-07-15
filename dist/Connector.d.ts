@@ -12,10 +12,10 @@ export declare type ConnectorOptions = IServerOptions & {
     serverIndex: number;
     connectorURI: string;
     gateURI: string;
-    masterURI?: string;
+    masterServerURI?: string;
     areaRoomIds: Array<string>;
     areaServerURIs: Array<string>;
-    relayServerURI?: string;
+    relayURI?: string;
 };
 export interface RoomAvailable {
     clients: number;
@@ -28,6 +28,7 @@ export interface BroadcastOptions {
 export declare abstract class Connector extends EventEmitter {
     protected httpServer: any;
     private relayChannel?;
+    private masterServerChannel?;
     areaOptions: {
         [areaId: string]: any;
     };
@@ -53,7 +54,7 @@ export declare abstract class Connector extends EventEmitter {
     private _relayMessageTimeout;
     private server;
     private gateURI;
-    private masterURI;
+    private masterServerURI;
     private relayURI;
     private responder;
     private reservedSeats;

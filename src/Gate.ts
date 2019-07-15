@@ -1,5 +1,5 @@
 import { Messenger as Requester, Broker } from 'gotti-reqres/dist';
-import { GateProtocol } from './Protocol';
+import { GateProtocol, GOTTI_GATE_CHANNEL_PREFIX } from './Protocol';
 import { sortByProperty, generateId } from './Util';
 
 export interface ConnectorData {

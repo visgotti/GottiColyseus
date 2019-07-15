@@ -91,6 +91,8 @@ export enum StateProtocol {
     PATCH = 1
 }
 
+export const GOTTI_GATE_CHANNEL_PREFIX = '__GOTTI_GATE_CHANNEL__';
+
 export const GOTTI_MASTER_CHANNEL_ID = '__GOTTI_MASTER_CHANNEL__';
 export const GOTTI_MASTER_SERVER_INDEX = 55555;
 

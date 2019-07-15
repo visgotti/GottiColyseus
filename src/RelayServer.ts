@@ -13,7 +13,6 @@ export type PlayerData = {
 }
 
 export type RelayServerOptions = {
-    serverIndex: number,
     connectorURIs: Array<string>;
     relayURI: string;
 }

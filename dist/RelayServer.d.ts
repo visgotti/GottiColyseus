@@ -5,7 +5,6 @@ export declare type PlayerData = {
     p2p?: boolean;
 };
 export declare type RelayServerOptions = {
-    serverIndex: number;
     connectorURIs: Array<string>;
     relayURI: string;
 };

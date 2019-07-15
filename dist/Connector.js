@@ -55,11 +55,12 @@ class Connector extends events_1.EventEmitter {
             client.on('error', (err) => console.error(err.message + '\n' + err.stack));
             //send(client, [Protocol.USER_ID, client.gottiId])
         };
+        this.masterServerURI = options.masterServerURI;
         this.gateURI = options.gateURI;
         this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE;
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
-        this.relayURI = options.relayServerURI;
+        this.relayURI = options.relayURI;
         this.areaServerURIs = options.areaServerURIs;
         this.serverIndex = options.serverIndex;
         this.port = options.port | 8080;
@@ -101,8 +102,8 @@ class Connector extends events_1.EventEmitter {
         this.masterChannel = new dist_2.FrontMaster(this.serverIndex);
         let backChannelURIs = [...this.areaServerURIs];
         let backChannelIds = [...this.areaRoomIds];
-        if (this.gateURI) {
-            backChannelURIs.push(this.gateURI);
+        if (this.masterServerURI) {
+            backChannelURIs.push(this.masterServerURI);
             backChannelIds.push(Protocol_1.GOTTI_MASTER_CHANNEL_ID);
         }
         if (this.relayURI) {
@@ -116,6 +117,9 @@ class Connector extends events_1.EventEmitter {
         this.masterChannel.addChannels(backChannelIds);
         this.channels = this.masterChannel.frontChannels;
         this.relayChannel = this.channels[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
+        if (this.channels[Protocol_1.GOTTI_MASTER_CHANNEL_ID]) {
+            this.masterServerChannel = this.channels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+        }
         //TODO: right now you need to wait a bit after connecting and binding to uris will refactor channels eventually to fix this
         return new Promise((resolve, reject) => {
             setTimeout(() => {

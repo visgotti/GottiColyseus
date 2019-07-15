@@ -56,6 +56,7 @@ export declare enum StateProtocol {
     SET = 0,
     PATCH = 1
 }
+export declare const GOTTI_GATE_CHANNEL_PREFIX = "__GOTTI_GATE_CHANNEL__";
 export declare const GOTTI_MASTER_CHANNEL_ID = "__GOTTI_MASTER_CHANNEL__";
 export declare const GOTTI_MASTER_SERVER_INDEX = 55555;
 export declare const GOTTI_RELAY_CHANNEL_ID = "__GOTTI_RELAY_CHANNEL__";

@@ -56,10 +56,10 @@ export type ConnectorOptions = IServerOptions & {
     serverIndex: number,
     connectorURI: string,
     gateURI: string,
-    masterURI?: string,
+    masterServerURI?: string,
     areaRoomIds: Array<string>,
     areaServerURIs: Array<string>,
-    relayServerURI?: string,
+    relayURI?: string,
 };
 
 export interface RoomAvailable {
@@ -76,6 +76,7 @@ export abstract class Connector extends EventEmitter {
     protected httpServer: any;
 
     private relayChannel?: FrontChannel;
+    private masterServerChannel?: FrontChannel;
 
     public areaOptions: {[areaId: string]: any};
 
@@ -105,7 +106,7 @@ export abstract class Connector extends EventEmitter {
 
     private server: any;
     private gateURI: string;
-    private masterURI: string;
+    private masterServerURI: string;
     private relayURI: string;
 
     private responder: Responder;
@@ -116,11 +117,12 @@ export abstract class Connector extends EventEmitter {
 
     constructor(options: ConnectorOptions) {
         super();
+        this.masterServerURI = options.masterServerURI;
         this.gateURI = options.gateURI;
         this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE;
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
-        this.relayURI = options.relayServerURI;
+        this.relayURI = options.relayURI;
         this.areaServerURIs = options.areaServerURIs;
         this.serverIndex = options.serverIndex;
         this.port = options.port | 8080;
@@ -189,8 +191,8 @@ export abstract class Connector extends EventEmitter {
         this.masterChannel = new FrontMaster(this.serverIndex);
         let backChannelURIs = [...this.areaServerURIs];
         let backChannelIds = [...this.areaRoomIds];
-        if(this.gateURI) {
-            backChannelURIs.push(this.gateURI);
+        if(this.masterServerURI) {
+            backChannelURIs.push(this.masterServerURI);
             backChannelIds.push(GOTTI_MASTER_CHANNEL_ID);
         }
         if(this.relayURI) {
@@ -204,6 +206,9 @@ export abstract class Connector extends EventEmitter {
 
         this.channels = this.masterChannel.frontChannels;
         this.relayChannel = this.channels[GOTTI_RELAY_CHANNEL_ID];
+        if(this.channels[GOTTI_MASTER_CHANNEL_ID]) {
+            this.masterServerChannel = this.channels[GOTTI_MASTER_CHANNEL_ID];
+        }
 
         //TODO: right now you need to wait a bit after connecting and binding to uris will refactor channels eventually to fix this
         return new Promise((resolve, reject) => {
