@@ -83,7 +83,7 @@ export declare class Gate {
      * @param serverIndex
      * @param auth
      * @param seatOptions
-     * @returns {{host, port, gottiId}}
+     * @returns {{host, port, gottiId, playerIndex }}
      */
     private addPlayerToConnector;
     /**
