@@ -12,10 +12,7 @@ export declare class RelayServer {
     masterChannel: BackMaster;
     private channel;
     private clientMap;
-    private p2pConnectionMap;
-    private currentConnections;
     constructor(options: RelayServerOptions);
     private registerBackChannelMessages;
-    private handleRemovePlayerConnections;
     private handlePeerConnection;
 }

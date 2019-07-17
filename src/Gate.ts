@@ -221,10 +221,10 @@ export class Gate {
 
         const { auth, options, gameType } = validated;
 
-        const { host, port, gottiId } = await this.matchMake(gameType, auth, options);
+        const { host, port, gottiId, playerIndex } = await this.matchMake(gameType, auth, options);
 
         if(host && port) {
-            return res.status(200).json({ host, port, gottiId });
+            return res.status(200).json({ host, port, gottiId, playerIndex });
         } else {
             return res.status(500).json('Invalid request');
         }
@@ -257,8 +257,8 @@ export class Gate {
 
             console.log('the connector data was', connectorData);
 
-            const { host, port, gottiId } = await this.addPlayerToConnector(connectorData.serverIndex, auth, seatOptions);
-            return { host, port, gottiId };
+            const { host, port, gottiId, playerIndex } = await this.addPlayerToConnector(connectorData.serverIndex, auth, seatOptions);
+            return { host, port, gottiId, playerIndex };
         } catch (err) {
             throw err;
         }
@@ -316,11 +316,11 @@ export class Gate {
         const connectorData = this.connectorsByServerIndex[serverIndex];
         try {
             console.log('sending reserve seat....');
-            const { host, port, gottiId } = await this.reserveSeat(serverIndex, auth, seatOptions);
+            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, seatOptions);
             connectorData.connectedClients++;
             //sorts
             this.gamesById[connectorData.gameId].connectorsData.sort(sortByProperty('connectedClients'));
-            return { host, port, gottiId } ;
+            return { host, port, gottiId, playerIndex } ;
         } catch(err) {
             throw err;
         }

@@ -10,8 +10,6 @@ class RelayServer {
         this.masterChannel = null;
         this.channel = null;
         this.clientMap = {};
-        this.p2pConnectionMap = {};
-        this.currentConnections = [];
         this.masterChannel = new dist_1.BackMaster(Protocol_1.GOTTI_RELAY_SERVER_INDEX);
         this.masterChannel.initialize(options.relayURI, options.connectorURIs);
         this.masterChannel.addChannels([Protocol_1.GOTTI_RELAY_CHANNEL_ID]);
@@ -22,10 +20,10 @@ class RelayServer {
         this.channel.onMessage((message) => {
             const protocol = message[0];
             if (protocol === 100 /* CLIENT_WEB_RTC_ENABLED */) {
-                console.log('RelayServer handling CLIENT_WEB_RTC_ENABLED, playerIndex was', message[1]);
+                //    console.log('RelayServer handling CLIENT_WEB_RTC_ENABLED, playerIndex was', message[1]);
                 // [protocol,  playerIndex]
                 if (this.clientMap[message[1]]) {
-                    console.log('RelayServer handling CLIENT_WEB_RTC_ENABLED enabled p2p!');
+                    //  console.log('RelayServer handling CLIENT_WEB_RTC_ENABLED enabled p2p!');
                     this.clientMap[message[1]].p2p = true;
                 }
                 else {
@@ -34,7 +32,7 @@ class RelayServer {
             }
             else if (protocol === 111 /* SIGNAL_REQUEST */) {
                 //    this.onMessage();
-                // [protocol, toPlayerIndex, { sdp, connection  }, fromPlayerIndex, frontUid]
+                // [protocol, toPlayerIndex, { sdp, candidate  }, fromPlayerIndex, frontUid]
                 this.handlePeerConnection(message[1], message[2], message[3], message[4]);
                 //  this.onMessage(message[1]);
             }
@@ -43,56 +41,34 @@ class RelayServer {
                 const clientData = this.clientMap[message[1]];
                 if (clientData) {
                     if (clientData.p2p) {
-                        this.handleRemovePlayerConnections(message[1]);
+                        clientData.p2p = false;
                     }
                 }
             }
             else if (protocol === 10 /* JOIN_CONNECTOR */) {
-                console.log('RelayServer handling JOIN_CONNECTOR, p2p_capapable was:', message[1], 'playerIndex was', message[2], 'gottiId was', message[3], 'connectorId was', message[4]);
+                //     console.log('RelayServer handling JOIN_CONNECTOR, p2p_capapable was:', message[1], 'playerIndex was', message[2], 'gottiId was', message[3], 'connectorId was', message[4]);
                 this.clientMap[message[2]] = {
                     p2p: message[1],
                     gottiId: message[3],
                     connectorId: message[4],
                 };
-                this.p2pConnectionMap[message[2]] = [];
             }
             else if (protocol === 12 /* LEAVE_CONNECTOR */) {
-                const clientData = this.clientMap[message[1]];
-                if (clientData) {
-                    if (clientData.p2p) {
-                        this.handleRemovePlayerConnections(message[1]);
-                    }
-                    delete this.clientMap[message[1]];
-                    delete this.p2pConnectionMap[message[1]];
-                }
+                delete this.clientMap[message[1]];
             }
             else if (protocol === 109 /* PEER_REMOTE_SYSTEM_MESSAGE */) {
                 //[Protocol.PEER_REMOTE_SYSTEM_MESSAGE, peerIndex, message.type, message.data, message.to, message.from, playerIndex];
                 const clientData = this.clientMap[message[1]];
                 if (clientData) {
-                    console.log('GOT PEER REMOTE SYSTEM MESSAGE ON RELAY SERVER');
+                    //      console.log('GOT PEER REMOTE SYSTEM MESSAGE ON RELAY SERVER');
                     //]Protocol.PEER_REMOTE_SYSTEM_MESSAGE, toGottiId, fromPlayerIndex, type, data, toSystems, fromSystem ]);
                     this.channel.send([protocol, clientData.gottiId, message[6], message[2], message[3], message[4], message[5]], clientData.connectorId);
                 }
             }
         });
     }
-    handleRemovePlayerConnections(playerIndex) {
-        /*
-        if(this.playerIndexToConnections[playerIndex]) {
-            this.playerIndexToConnections[playerIndex].forEach(connection => {
-                connection.break();
-            })
-        }*/
-        this.clientMap[playerIndex].p2p = false;
-        let connections = this.p2pConnectionMap[playerIndex];
-        let len = connections.length;
-        while (len--) {
-            connections[len].splice(connections[len].indexOf(playerIndex), 1);
-        }
-    }
     handlePeerConnection(toPlayerIndex, fromPlayerSignalData, fromPlayerIndex, connectorId) {
-        console.log('RelayServer SIGNAL_REQUEST > handlePeerConnection , toPlayerIndex was:', toPlayerIndex, 'fromPlayerSignalData:', fromPlayerSignalData, 'fromPlayerIndex: ', fromPlayerIndex, 'connectorId:', connectorId);
+        //   console.log('RelayServer SIGNAL_REQUEST > handlePeerConnection , toPlayerIndex was:', toPlayerIndex, 'fromPlayerSignalData:', fromPlayerSignalData, 'fromPlayerIndex: ', fromPlayerIndex, 'connectorId:', connectorId);
         const playersExistInMap = fromPlayerIndex in this.clientMap && toPlayerIndex in this.clientMap;
         let playersAreBothP2PEnabled = false;
         if (playersExistInMap) {
@@ -101,13 +77,7 @@ class RelayServer {
         if (playersExistInMap && playersAreBothP2PEnabled) {
             let { connectorId, gottiId, } = this.clientMap[toPlayerIndex];
             const toPlayerData = { gottiId, connectorId };
-            if (!(this.p2pConnectionMap[toPlayerIndex].includes(fromPlayerIndex))) {
-                this.p2pConnectionMap[toPlayerIndex].push(fromPlayerIndex);
-            }
-            if (!(this.p2pConnectionMap[fromPlayerIndex].includes(toPlayerIndex))) {
-                this.p2pConnectionMap[fromPlayerIndex].push(toPlayerIndex);
-            }
-            console.log('RelayServer handlePeerConnection sending signal success');
+            //     console.log('RelayServer handlePeerConnection sending signal success')
             this.channel.send([112 /* SIGNAL_SUCCESS */, fromPlayerIndex, fromPlayerSignalData, toPlayerData.gottiId], toPlayerData.connectorId);
         }
         else {

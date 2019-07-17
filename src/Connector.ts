@@ -371,7 +371,7 @@ export abstract class Connector extends EventEmitter {
             const protocol = message[0];
 
             if(protocol === Protocol.ENABLED_CLIENT_P2P_SUCCESS) {
-                console.log('Connector.registerRelayMessages ENABLED_CLIENT_P2P_SUCCESS for player', message[1]);
+           //     console.log('Connector.registerRelayMessages ENABLED_CLIENT_P2P_SUCCESS for player', message[1]);
                 const client = this.clientsById[message[1]];
                 if(client) {
                     client.p2p_enabled = true;
@@ -380,7 +380,7 @@ export abstract class Connector extends EventEmitter {
             } else if(protocol === Protocol.SIGNAL_SUCCESS) {
                 //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, toPlayerrGottiId], toPlayerData.connectorId)
                 const toClient = this.clientsById[message[3]];
-                console.log('Connector.registerRelayMessages SIGNAL_SUCCESS sending to player', toClient.gottiId, 'from player index:', message[1], 'and the signalData was', message[2]);
+                console.log('Connector.registerRelayMessages SIGNAL_SUCCESS sending to player', toClient.playerIndex, 'from player index:', message[1], 'and the signalData was', message[2]);
 
                 // sends the sdp and ice to other client of client
                 if(toClient) {
@@ -449,7 +449,7 @@ export abstract class Connector extends EventEmitter {
         } else if(protocol === Protocol.GET_INITIAL_CLIENT_AREA_WRITE) {
             this._getInitialWriteArea(client, decoded[1])
         } else if(protocol === Protocol.PEER_REMOTE_SYSTEM_MESSAGE){
-            console.log('Connector _onWebClientMessage handlng PEER_REMOTE_SYSTEM_MESSAGE for peer', decoded[1], 'from player:', client.gottiId);
+         //   console.log('Connector _onWebClientMessage handlng PEER_REMOTE_SYSTEM_MESSAGE for peer', decoded[1], 'from player:', client.gottiId);
             //[Protocol.PEER_REMOTE_SYSTEM_MESSAGE, peerIndex, message.type, message.data, message.to, message.from, playerIndex]);
             this.relayChannel.send([...decoded, client.playerIndex])
         } else if(protocol === Protocol.PEERS_REMOTE_SYSTEM_MESSAGE) {
@@ -491,9 +491,6 @@ export abstract class Connector extends EventEmitter {
 
             return true;
         } catch(err) {
-            console.log('clientId was:', client.gottiId);
-            console.log('areaId was', areaId);
-            console.log('error in addAreaListen was', err);
             //   console.log('error was', err);
             return false;
         }
