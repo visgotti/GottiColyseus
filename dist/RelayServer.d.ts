@@ -15,4 +15,5 @@ export declare class RelayServer {
     constructor(options: RelayServerOptions);
     private registerBackChannelMessages;
     private handlePeerConnection;
+    private handlePeerConnectionRequest;
 }

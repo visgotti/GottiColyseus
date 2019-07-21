@@ -250,14 +250,22 @@ class Connector extends events_1.EventEmitter {
             else if (protocol === 112 /* SIGNAL_SUCCESS */) {
                 //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, toPlayerrGottiId], toPlayerData.connectorId)
                 const toClient = this.clientsById[message[3]];
-                console.log('Connector.registerRelayMessages SIGNAL_SUCCESS sending to player', toClient.playerIndex, 'from player index:', message[1], 'and the signalData was', message[2]);
                 // sends the sdp and ice to other client of client
                 if (toClient) {
-                    // [protocol, fromPlayerIndex, fromPlayerSignalData]
+                    // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
                     Protocol_1.send(toClient, [protocol, message[1], message[2]]);
                 }
             }
-            else if (protocol === 109 /* PEER_REMOTE_SYSTEM_MESSAGE */) {
+            else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
+                //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, systemName, requestOptions, toPlayerrGottiId], toPlayerData.connectorId)
+                const toClient = this.clientsById[message[5]];
+                console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
+                if (toClient) {
+                    // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
+                    Protocol_1.send(toClient, [protocol, message[1], message[2], message[3], message[4]]);
+                }
+            }
+            if (protocol === 109 /* PEER_REMOTE_SYSTEM_MESSAGE */) {
                 //Protocol.PEER_REMOTE_SYSTEM_MESSAGE, toGottiId, fromPlayerIndex, message.type, message.data, message.to, message.from]);
                 const toClient = this.clientsById[message[1]];
                 if (toClient) {
@@ -347,6 +355,11 @@ class Connector extends events_1.EventEmitter {
             // [protocol, toPlayerIndex, { sdp, candidate }
             console.log('Connector _onWebClientMessage handlng SIGNAL_REQUEST that should be sent to', decoded[1], 'and from playerIndex:', client.playerIndex, 'the sdp/candidate info was', decoded[2]);
             this.relayChannel.send([protocol, decoded[1], decoded[2], client.playerIndex, this.relayChannel.frontUid]);
+        }
+        else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
+            console.log('GOT PEER CONNECTION REQUEST BACK FROM CLIENT!!!!!!!!!!!!!! SEND TO RELAY');
+            // protocol, toPlayerIndex, { sdp, candidate }, systemName, options
+            this.relayChannel.send([protocol, decoded[1], decoded[2], decoded[3], decoded[4], client.playerIndex, this.relayChannel.frontUid]);
         }
     }
     async addAreaListen(client, areaId, options) {
