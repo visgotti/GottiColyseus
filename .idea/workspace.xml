@@ -3,13 +3,16 @@
   <component name="ChangeListManager">
     <list default="true" id="1e635a51-19f4-4601-81b7-f1f6e27a360a" name="Default" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/AreaRoom.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/dist/AreaRoom.d.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/AreaRoom.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/AreaRoom.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/dist/Connector.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Connector.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/MasterServer.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/dist/MasterServer.d.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/MasterServer.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/MasterServer.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/dist/Protocol.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Protocol.d.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/RelayServer.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/dist/RelayServer.d.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/RelayServer.js" beforeDir="false" afterPath="$PROJECT_DIR$/dist/RelayServer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/AreaRoom.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/AreaRoom.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/Connector.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/Connector.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/MasterServer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/MasterServer.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/Protocol.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/Protocol.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/RelayServer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/RelayServer.ts" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/.tmp/" />
     <ignored path="$PROJECT_DIR$/temp/" />
@@ -34,32 +37,42 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/Protocol.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="78">
-              <caret line="64" column="28" selection-start-line="64" selection-start-column="28" selection-end-line="64" selection-end-column="28" />
+            <state relative-caret-position="782">
+              <caret line="46" column="33" selection-start-line="46" selection-start-column="33" selection-end-line="46" selection-end-column="33" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/Connector.ts">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="248">
+              <caret line="58" column="19" selection-start-line="58" selection-start-column="4" selection-end-line="58" selection-end-column="19" />
+              <folding>
+                <element signature="e#650#677#0" expanded="true" />
+                <element signature="e#1340#1378#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/src/RelayServer.ts">
+        <entry file="file://$PROJECT_DIR$/src/AreaRoom.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="271">
-              <caret line="73" column="134" lean-forward="true" selection-start-line="73" selection-start-column="134" selection-end-line="73" selection-end-column="134" />
+            <state relative-caret-position="316">
+              <caret line="72" column="33" lean-forward="true" selection-start-line="72" selection-start-column="33" selection-end-line="72" selection-end-column="33" />
               <folding>
-                <element signature="n#!!doc" expanded="true" />
+                <element signature="e#0#62#0" expanded="true" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/AreaRoom.ts">
+        <entry file="file://$PROJECT_DIR$/src/AreaServer.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="333">
-              <caret line="168" column="62" selection-start-line="168" selection-start-column="62" selection-end-line="168" selection-end-column="62" />
-              <folding>
-                <element signature="e#0#62#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="169">
+              <caret line="18" column="25" lean-forward="true" selection-start-line="18" selection-start-column="25" selection-end-line="18" selection-end-column="25" />
             </state>
           </provider>
         </entry>
@@ -76,8 +89,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/index.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="85">
-              <caret line="5" column="34" selection-start-line="5" selection-start-column="34" selection-end-line="5" selection-end-column="34" />
+            <state relative-caret-position="68">
+              <caret line="4" column="43" lean-forward="true" selection-start-line="4" selection-start-column="43" selection-end-line="4" selection-end-column="43" />
             </state>
           </provider>
         </entry>
@@ -94,8 +107,11 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/MasterServer.ts">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="221">
-              <caret line="16" column="19" selection-start-line="16" selection-start-column="19" selection-end-line="16" selection-end-column="19" />
+            <state relative-caret-position="459">
+              <caret line="27" lean-forward="true" selection-start-line="27" selection-end-line="27" />
+              <folding>
+                <element signature="e#0#67#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -114,19 +130,6 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/Connector.ts">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="510">
-              <caret line="483" column="62" selection-start-line="483" selection-start-column="39" selection-end-line="483" selection-end-column="62" />
-              <folding>
-                <element signature="e#650#677#0" expanded="true" />
-                <element signature="e#1340#1378#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
     </leaf>
   </component>
   <component name="FileTemplateManagerImpl">
@@ -138,36 +141,36 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>_getInitialWriteArea</find>
-      <find>getInitialWriteArea</find>
-      <find>areaOptions</find>
-      <find>p2p</find>
-      <find>onJoin</find>
-      <find>p2p_capable</find>
-      <find>client.p2p</find>
-      <find>registerRelayMessages</find>
-      <find>_onJoin</find>
-      <find>_onWeb</find>
-      <find>PEER_REMOTE_SYSTEM_MESSAGE</find>
-      <find>GET_</find>
-      <find>handlePeerConnection</find>
-      <find>console.log</find>
-      <find>SIGNAL</find>
-      <find>gottiId:</find>
-      <find>req.auth</find>
-      <find>connectedClients</find>
-      <find>reserveSeat</find>
-      <find>addPlayerToConnector</find>
-      <find>matchMake</find>
-      <find>playerIndex</find>
-      <find>gottiId</find>
-      <find>200</find>
-      <find>handleRemovePlayerConnections</find>
-      <find>push</find>
-      <find>SIGNAL_REQUEST</find>
-      <find>handlePeerConnectionRequest</find>
-      <find>splice</find>
-      <find>PEER_CONNECTION_REQUEST</find>
+      <find>sendQueuedMessages</find>
+      <find>this.masterChannel</find>
+      <find>masterServer</find>
+      <find>registerMasterServerMessages</find>
+      <find>onMessage</find>
+      <find>register</find>
+      <find>registerMasterServerMes</find>
+      <find>this.channels</find>
+      <find>this.channels[</find>
+      <find>send</find>
+      <find>abstract</find>
+      <find>registerMaster</find>
+      <find>masterCh</find>
+      <find>masterChannel</find>
+      <find>areaRoomIds</find>
+      <find>sendLocal</find>
+      <find>MASTER</find>
+      <find>BROADCAST</find>
+      <find>masterServerChannel</find>
+      <find>masterServerChannel.send</find>
+      <find>AREA_TO_MASTER_MESSAGE</find>
+      <find>AREA_</find>
+      <find>relay</find>
+      <find>relayURI</find>
+      <find>masterServerURI</find>
+      <find>registerChannelMessages</find>
+      <find>protocol</find>
+      <find>Protocol</find>
+      <find>dispatchToAreas</find>
+      <find>gottiProcess</find>
     </findStrings>
     <replaceStrings>
       <replace>serverIndex</replace>
@@ -244,17 +247,17 @@
         <option value="$PROJECT_DIR$/test/mocks/connectors/DummyConnector.ts" />
         <option value="$PROJECT_DIR$/node_modules/gotti-channels/dist/Back/BackChannel/BackChannel.js" />
         <option value="$PROJECT_DIR$/src/ConnectorClient.ts" />
-        <option value="$PROJECT_DIR$/src/AreaRoom.ts" />
         <option value="$PROJECT_DIR$/.npmignore" />
         <option value="$PROJECT_DIR$/.gitignore" />
         <option value="$PROJECT_DIR$/package.json" />
         <option value="$PROJECT_DIR$/src/SignalServer.ts" />
         <option value="$PROJECT_DIR$/src/index.ts" />
-        <option value="$PROJECT_DIR$/src/MasterServer.ts" />
         <option value="$PROJECT_DIR$/src/Gate.ts" />
+        <option value="$PROJECT_DIR$/src/RelayServer.ts" />
         <option value="$PROJECT_DIR$/src/Protocol.ts" />
         <option value="$PROJECT_DIR$/src/Connector.ts" />
-        <option value="$PROJECT_DIR$/src/RelayServer.ts" />
+        <option value="$PROJECT_DIR$/src/AreaRoom.ts" />
+        <option value="$PROJECT_DIR$/src/MasterServer.ts" />
       </list>
     </option>
   </component>
@@ -275,6 +278,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -296,7 +300,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
       <pane id="PackagesPane" />
     </panes>
   </component>
@@ -428,16 +431,20 @@
       <workItem from="1563059356179" duration="1075000" />
       <workItem from="1563122437990" duration="30416000" />
       <workItem from="1563599141311" duration="9517000" />
+      <workItem from="1564340281319" duration="137000" />
+      <workItem from="1564340592538" duration="3966000" />
+      <workItem from="1564344575369" duration="1070000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="347830000" />
+    <option name="totallyTimeSpent" value="353003000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="5432" y="-8" width="1936" height="1056" extended-state="6" />
+    <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.098614074" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.10181237" />
       <window_info id="Structure" order="1" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info id="Image Layers" order="3" />
@@ -596,13 +603,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/AreaServer.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="282">
-          <caret line="26" selection-start-line="26" selection-end-line="26" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/dist/RelayServer.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="340">
@@ -637,17 +637,17 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/Protocol.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="782">
+          <caret line="46" column="33" selection-start-line="46" selection-start-column="33" selection-end-line="46" selection-end-column="33" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/package.json">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="408">
           <caret line="24" column="36" selection-start-line="24" selection-start-column="36" selection-end-line="24" selection-end-column="36" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/index.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="85">
-          <caret line="5" column="34" selection-start-line="5" selection-start-column="34" selection-end-line="5" selection-end-column="34" />
         </state>
       </provider>
     </entry>
@@ -658,32 +658,8 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/MasterServer.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="221">
-          <caret line="16" column="19" selection-start-line="16" selection-start-column="19" selection-end-line="16" selection-end-column="19" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/AreaClient.ts">
       <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/AreaRoom.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="333">
-          <caret line="168" column="62" selection-start-line="168" selection-start-column="62" selection-end-line="168" selection-end-column="62" />
-          <folding>
-            <element signature="e#0#62#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/Protocol.ts">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="78">
-          <caret line="64" column="28" selection-start-line="64" selection-start-column="28" selection-end-line="64" selection-end-column="28" />
-        </state>
-      </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/ConnectorClient.ts">
       <provider selected="true" editor-type-id="text-editor">
@@ -692,10 +668,27 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/RelayServer.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1547">
+          <caret line="92" column="22" selection-start-line="92" selection-start-column="22" selection-end-line="92" selection-end-column="22" />
+          <folding>
+            <element signature="n#!!doc" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/index.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="68">
+          <caret line="4" column="43" lean-forward="true" selection-start-line="4" selection-start-column="43" selection-end-line="4" selection-end-column="43" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/Connector.ts">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="510">
-          <caret line="483" column="62" selection-start-line="483" selection-start-column="39" selection-end-line="483" selection-end-column="62" />
+        <state relative-caret-position="248">
+          <caret line="58" column="19" selection-start-line="58" selection-start-column="4" selection-end-line="58" selection-end-column="19" />
           <folding>
             <element signature="e#650#677#0" expanded="true" />
             <element signature="e#1340#1378#0" expanded="true" />
@@ -703,12 +696,29 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/RelayServer.ts">
+    <entry file="file://$PROJECT_DIR$/src/MasterServer.ts">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="271">
-          <caret line="73" column="134" lean-forward="true" selection-start-line="73" selection-start-column="134" selection-end-line="73" selection-end-column="134" />
+        <state relative-caret-position="459">
+          <caret line="27" lean-forward="true" selection-start-line="27" selection-end-line="27" />
           <folding>
-            <element signature="n#!!doc" expanded="true" />
+            <element signature="e#0#67#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/AreaServer.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="169">
+          <caret line="18" column="25" lean-forward="true" selection-start-line="18" selection-start-column="25" selection-end-line="18" selection-end-column="25" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/AreaRoom.ts">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="316">
+          <caret line="72" column="33" lean-forward="true" selection-start-line="72" selection-start-column="33" selection-end-line="72" selection-end-column="33" />
+          <folding>
+            <element signature="e#0#62#0" expanded="true" />
           </folding>
         </state>
       </provider>

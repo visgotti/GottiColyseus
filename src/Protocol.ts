@@ -38,7 +38,8 @@ export const enum Protocol {
         // area to area communication
     AREA_PUBLIC_OPTIONS = 33,
     AREA_TO_AREA_SYSTEM_MESSAGE = 34,
-
+    AREA_TO_MASTER_MESSAGE = 35,
+    MASTER_TO_AREA_BROADCAST = 36,
         // Generic messages (50~60)
     BAD_REQUEST = 50,
 

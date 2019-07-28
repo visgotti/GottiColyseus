@@ -1,7 +1,8 @@
 import { Messenger as Requester, Broker } from 'gotti-reqres/dist';
 import {BackChannel, BackMaster} from "gotti-channels/dist";
-import { GateProtocol, GOTTI_MASTER_CHANNEL_ID, GOTTI_MASTER_SERVER_INDEX } from './Protocol';
+import { GateProtocol, Protocol, GOTTI_MASTER_CHANNEL_ID, GOTTI_MASTER_SERVER_INDEX } from './Protocol';
 import { sortByProperty, generateId } from './Util';
+import {ConnectorClient as Client} from "./ConnectorClient";
 
 export interface ConnectorData {
     host: string,
@@ -11,26 +12,33 @@ export interface ConnectorData {
 
 export interface MasterConfig {
     masterURI: string,
-    connectorsData: Array<ConnectorData>,
+    connectorURIs: Array<string>,
 }
 
-export class MasterServer {
+export abstract class MasterServer {
     private connectorsByServerIndex: { [serverIndex: number]: ConnectorData } = {};
     private masterChannel: BackMaster = null;
-    private backChannel: BackChannel = null;
+    private channel: BackChannel = null;
 
-    constructor() {
+    constructor(options: MasterConfig) {
         this.masterChannel = new BackMaster(GOTTI_MASTER_SERVER_INDEX);
-        this.masterChannel.addChannels(GOTTI_MASTER_CHANNEL_ID);
-        this.backChannel = this.masterChannel.backChannels[GOTTI_MASTER_CHANNEL_ID];
+        this.masterChannel.initialize(options.masterURI, options.connectorURIs);
+        this.masterChannel.addChannels([GOTTI_MASTER_CHANNEL_ID]);
+        this.channel = this.masterChannel.backChannels[GOTTI_MASTER_CHANNEL_ID];
+
+        this.channel.onMessage((message) => {
+            if(message[0] === Protocol.AREA_TO_MASTER_MESSAGE) {
+                this.onAreaMessage(message[1], message[2]);
+            }
+        });
     }
 
     /**
-     * sends message to connector servers that can be handled with onGateMessage implementation
+     * sends message to an area that can be handled in any systems onMasterMessage
      * @param message
      */
-    public sendConnectors(message: any) {
-        this.backChannel.broadcast(message);
+    public dispatchToAreas(message){
+        this.channel.broadcast([Protocol.MASTER_TO_AREA_BROADCAST, message])
     }
 
     private initializeGracefulShutdown() {
@@ -66,4 +74,8 @@ export class MasterServer {
 
         return this.connectorsByServerIndex[serverIndex];
     }
+    public abstract onConnectorMessage(client: Client, message: any): void;
+    public abstract onAreaMessage(areaId: Client, message: any): void;
+
+
 }

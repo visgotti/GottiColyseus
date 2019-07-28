@@ -226,10 +226,17 @@ class Connector extends events_1.EventEmitter {
             registerHandler(channel);
         }
     }
-    registerMasterServerMessages(masterServerChannel) {
-        if (masterServerChannel) {
-            masterServerChannel.onMessage((message) => {
-                this.onMasterMessage && this.onMasterMessage(message);
+    registerMasterServerMessages() {
+        if (this.masterServerChannel) {
+            this.masterServerChannel.onMessage((message) => {
+                if (message[0] === 36 /* MASTER_TO_AREA_BROADCAST */) {
+                    //TODO: the only way to broadcast to all area rooms right now is through an area front channel since the masterServerChannel doesnt know about the areas
+                    // we should probably try and keep the area front channels sorted by clients in them so we can use most optimized one to make the dispatches
+                    this.channels[this.areaRoomIds[0]].broadcast(message[1], this.areaRoomIds);
+                }
+                else {
+                    this.onMasterMessage && this.onMasterMessage(message);
+                }
             });
         }
     }
@@ -294,6 +301,9 @@ class Connector extends events_1.EventEmitter {
                 // reassign last value in array to the from area id
                 message[5] = areaChannel.channelId;
                 areaChannel.broadcast(message, toAreaIds);
+            }
+            else if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
+                this.masterServerChannel.send([35 /* AREA_TO_MASTER_MESSAGE */, areaChannel.channelId, message[1]]);
             }
         });
     }
