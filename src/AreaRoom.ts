@@ -142,6 +142,10 @@ export class AreaRoom extends EventEmitter {
         this.areaChannel.sendMainFront([Protocol.AREA_TO_AREA_SYSTEM_MESSAGE, message.type, message.data, message.to, message.from, areaIds])
     }
 
+    public dispatchToMaster(message: any) {
+        this.areaChannel.sendMainFront([Protocol.AREA_TO_MASTER_MESSAGE, message]);
+    }
+
     private _onConnectorMessage() {};
     private _onMessage(clientId, message) {};
     private _onGlobalMessage(clientId, message) {};
@@ -159,6 +163,8 @@ export class AreaRoom extends EventEmitter {
                     from: message[4],
                 });
               //  this.onMessage(message[1]);
+            } else if (message[0] === Protocol.MASTER_TO_AREA_BROADCAST) {
+                this.gottiProcess.messageQueue.addMasterMessage(message[1]);
             }
         });
 

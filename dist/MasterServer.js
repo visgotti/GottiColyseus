@@ -3,20 +3,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dist_1 = require("gotti-channels/dist");
 const Protocol_1 = require("./Protocol");
 class MasterServer {
-    constructor() {
+    constructor(options) {
         this.connectorsByServerIndex = {};
         this.masterChannel = null;
-        this.backChannel = null;
+        this.channel = null;
         this.masterChannel = new dist_1.BackMaster(Protocol_1.GOTTI_MASTER_SERVER_INDEX);
-        this.masterChannel.addChannels(Protocol_1.GOTTI_MASTER_CHANNEL_ID);
-        this.backChannel = this.masterChannel.backChannels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+        this.masterChannel.initialize(options.masterURI, options.connectorURIs);
+        this.masterChannel.addChannels([Protocol_1.GOTTI_MASTER_CHANNEL_ID]);
+        this.channel = this.masterChannel.backChannels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+        this.channel.onMessage((message) => {
+            if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
+                this.onAreaMessage(message[1], message[2]);
+            }
+        });
     }
     /**
-     * sends message to connector servers that can be handled with onGateMessage implementation
+     * sends message to an area that can be handled in any systems onMasterMessage
      * @param message
      */
-    sendConnectors(message) {
-        this.backChannel.broadcast(message);
+    dispatchToAreas(message) {
+        this.channel.broadcast([36 /* MASTER_TO_AREA_BROADCAST */, message]);
     }
     initializeGracefulShutdown() {
         //todo send messages to connector servers to let it know gate is down?

@@ -1,3 +1,4 @@
+import { ConnectorClient as Client } from "./ConnectorClient";
 export interface ConnectorData {
     host: string;
     port: number;
@@ -5,18 +6,20 @@ export interface ConnectorData {
 }
 export interface MasterConfig {
     masterURI: string;
-    connectorsData: Array<ConnectorData>;
+    connectorURIs: Array<string>;
 }
-export declare class MasterServer {
+export declare abstract class MasterServer {
     private connectorsByServerIndex;
     private masterChannel;
-    private backChannel;
-    constructor();
+    private channel;
+    constructor(options: MasterConfig);
     /**
-     * sends message to connector servers that can be handled with onGateMessage implementation
+     * sends message to an area that can be handled in any systems onMasterMessage
      * @param message
      */
-    sendConnectors(message: any): void;
+    dispatchToAreas(message: any): void;
     private initializeGracefulShutdown;
     private addConnector;
+    abstract onConnectorMessage(client: Client, message: any): void;
+    abstract onAreaMessage(areaId: Client, message: any): void;
 }

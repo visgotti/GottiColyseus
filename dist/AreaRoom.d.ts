@@ -58,6 +58,7 @@ export declare class AreaRoom extends EventEmitter {
      */
     dispatchToClient(clientId: string, message: SystemMessage): void;
     dispatchToAreas(message: SystemMessage, areaIds?: Array<string>): void;
+    dispatchToMaster(message: any): void;
     private _onConnectorMessage;
     private _onMessage;
     private _onGlobalMessage;

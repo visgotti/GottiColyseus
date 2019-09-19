@@ -93,6 +93,9 @@ class AreaRoom extends events_1.EventEmitter {
     dispatchToAreas(message, areaIds) {
         this.areaChannel.sendMainFront([34 /* AREA_TO_AREA_SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from, areaIds]);
     }
+    dispatchToMaster(message) {
+        this.areaChannel.sendMainFront([35 /* AREA_TO_MASTER_MESSAGE */, message]);
+    }
     _onConnectorMessage() { }
     ;
     _onMessage(clientId, message) { }
@@ -113,6 +116,9 @@ class AreaRoom extends events_1.EventEmitter {
                     from: message[4],
                 });
                 //  this.onMessage(message[1]);
+            }
+            else if (message[0] === 36 /* MASTER_TO_AREA_BROADCAST */) {
+                this.gottiProcess.messageQueue.addMasterMessage(message[1]);
             }
         });
         // get the add remote call reference from gottiProcess's message queue.

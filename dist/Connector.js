@@ -47,6 +47,7 @@ class Connector extends events_1.EventEmitter {
                 Protocol_1.send(client, [11 /* JOIN_CONNECTOR_ERROR */]);
             }
             else {
+                client.p2p_capable = query.isWebRTCSupported;
                 client.gottiId = req.gottiId;
                 client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
                 this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
@@ -55,10 +56,12 @@ class Connector extends events_1.EventEmitter {
             client.on('error', (err) => console.error(err.message + '\n' + err.stack));
             //send(client, [Protocol.USER_ID, client.gottiId])
         };
+        this.masterServerURI = options.masterServerURI;
         this.gateURI = options.gateURI;
         this.messageRelayRate = options.messageRelayRate || DEFAULT_RELAY_RATE;
         this.areaRoomIds = options.areaRoomIds;
         this.connectorURI = options.connectorURI;
+        this.relayURI = options.relayURI;
         this.areaServerURIs = options.areaServerURIs;
         this.serverIndex = options.serverIndex;
         this.port = options.port | 8080;
@@ -100,20 +103,34 @@ class Connector extends events_1.EventEmitter {
         this.masterChannel = new dist_2.FrontMaster(this.serverIndex);
         let backChannelURIs = [...this.areaServerURIs];
         let backChannelIds = [...this.areaRoomIds];
-        if (this.gateURI) {
-            backChannelURIs.push(this.gateURI);
+        if (this.masterServerURI) {
+            backChannelURIs.push(this.masterServerURI);
             backChannelIds.push(Protocol_1.GOTTI_MASTER_CHANNEL_ID);
         }
+        if (this.relayURI) {
+            backChannelURIs.push(this.relayURI);
+            backChannelIds.push(Protocol_1.GOTTI_RELAY_CHANNEL_ID);
+        }
+        else {
+            throw new Error('Connector.connectToAreas is failing because we dont have a relayURI specified! Gotti-Servers v0.2.5 and up require you set up a relay server.');
+        }
         this.masterChannel.initialize(this.connectorURI, backChannelURIs);
-        const gateChannelId = Protocol_1.GOTTI_MASTER_CHANNEL_ID;
-        this.masterChannel.addChannels(this.areaRoomIds);
+        this.masterChannel.addChannels(backChannelIds);
         this.channels = this.masterChannel.frontChannels;
+        this.relayChannel = this.channels[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
+        if (this.channels[Protocol_1.GOTTI_MASTER_CHANNEL_ID]) {
+            this.masterServerChannel = this.channels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+        }
         //TODO: right now you need to wait a bit after connecting and binding to uris will refactor channels eventually to fix this
         return new Promise((resolve, reject) => {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
                     this.areaOptions = connection.backChannelOptions;
-                    this.registerAreaMessages();
+                    // connection backChannelOptions were made with area channels in mind.. so
+                    // these frameworked channels keys should be deleted if theyre in.
+                    delete this.areaOptions[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
+                    delete this.areaOptions[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+                    this.registerChannelMessages();
                     this.server = new WebSocket.Server(this.options);
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
@@ -168,23 +185,6 @@ class Connector extends events_1.EventEmitter {
         }
         return true;
     }
-    /*
-    protected sendState(client: Client): void {
-
-        const stateUpdates = client.channelClient.queuedEncodedUpdates;
-        if (stateUpdates.length) {
-
-            send(client, [
-                    Protocols.STATE_UPDATES,
-                    stateUpdates
-                //this.clock.currentTime,
-                //this.clock.elapsedTime]
-            );
-            // clear updates after sent.
-            client.channelClient.clearStateUpdates();
-        }
-    }
-    */
     registerClientAreaMessageHandling(client) {
         client.channelClient.onMessage((message) => {
             if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
@@ -207,44 +207,114 @@ class Connector extends events_1.EventEmitter {
             }
         });
     }
-    registerMasterMessages() {
-        const masterChannel = this.masterChannel.frontChannels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
-        if (masterChannel) {
-            masterChannel.onMessage((message) => {
-                this.onMasterMessage && this.onMasterMessage(message);
-            });
-        }
-    }
-    registerAreaMessages() {
+    // iterates through all the channels the connector
+    // is listening to, and registers needed messages based
+    // on which type of channel it is.
+    registerChannelMessages() {
         const keys = Object.keys(this.channels);
         for (let i = 0; i < keys.length; i++) {
             const channelId = keys[i];
-            // dont want to register area messages on gate channel
-            if (channelId === Protocol_1.GOTTI_MASTER_CHANNEL_ID)
-                continue;
             const channel = this.channels[channelId];
-            channel.onMessage((message) => {
-                if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
-                    // add from area id
-                    // get all listening clients for area/channel
-                    const listeningClientUids = channel.listeningClientUids;
-                    let numClients = listeningClientUids.length;
-                    // iterate through all and relay message
-                    message = msgpack.encode(message);
-                    while (numClients--) {
-                        const client = this.clientsById[listeningClientUids[numClients]];
-                        Protocol_1.send(client, message, false);
-                    }
+            let registerHandler = this.registerAreaMessages.bind(this);
+            // change register handler if the channel id was a specified gotti frameworked channel id
+            if (channelId === Protocol_1.GOTTI_MASTER_CHANNEL_ID) {
+                registerHandler = this.registerMasterServerMessages.bind(this);
+            }
+            else if (channelId === Protocol_1.GOTTI_RELAY_CHANNEL_ID) {
+                registerHandler = this.registerRelayMessages.bind(this);
+            }
+            registerHandler(channel);
+        }
+    }
+    registerMasterServerMessages() {
+        if (this.masterServerChannel) {
+            this.masterServerChannel.onMessage((message) => {
+                if (message[0] === 36 /* MASTER_TO_AREA_BROADCAST */) {
+                    //TODO: the only way to broadcast to all area rooms right now is through an area front channel since the masterServerChannel doesnt know about the areas
+                    // we should probably try and keep the area front channels sorted by clients in them so we can use most optimized one to make the dispatches
+                    this.channels[this.areaRoomIds[0]].broadcast(message, this.areaRoomIds);
                 }
-                else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {
-                    // [protocol, type, data, to, from, areaIds]
-                    const toAreaIds = message[5];
-                    // reassign last value in array to the from area id
-                    message[5] = channel.channelId;
-                    channel.broadcast(message, toAreaIds);
+                else {
+                    this.onMasterMessage && this.onMasterMessage(message);
                 }
             });
         }
+    }
+    registerRelayMessages(relayChannel) {
+        if (!relayChannel || relayChannel !== this.relayChannel) {
+            throw new Error('Connector.registerRelayMessages did not receive a valid relayChannel');
+        }
+        relayChannel.onMessage((message) => {
+            const protocol = message[0];
+            if (protocol === 101 /* ENABLED_CLIENT_P2P_SUCCESS */) {
+                //     console.log('Connector.registerRelayMessages ENABLED_CLIENT_P2P_SUCCESS for player', message[1]);
+                const client = this.clientsById[message[1]];
+                if (client) {
+                    client.p2p_enabled = true;
+                    Protocol_1.send(this.clientsById[message[1]], [101 /* ENABLED_CLIENT_P2P_SUCCESS */]);
+                }
+            }
+            else if (protocol === 112 /* SIGNAL_SUCCESS */) {
+                //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, toPlayerrGottiId], toPlayerData.connectorId)
+                const toClient = this.clientsById[message[3]];
+                // sends the sdp and ice to other client of client
+                if (toClient) {
+                    // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
+                    Protocol_1.send(toClient, [protocol, message[1], message[2]]);
+                }
+            }
+            else if (protocol === 113 /* SIGNAL_FAILED */) {
+                // [protocol, fromPlayerIndex, toPlayerGottiId, options])
+                const toClient = this.clientsById[message[2]];
+                console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
+                if (toClient) {
+                    // [protocol, fromPlayerIndex]
+                    Protocol_1.send(toClient, [protocol, message[1], message[3]]);
+                }
+            }
+            else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
+                //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, systemName, requestOptions, toPlayerrGottiId], toPlayerData.connectorId)
+                const toClient = this.clientsById[message[5]];
+                console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
+                if (toClient) {
+                    // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
+                    Protocol_1.send(toClient, [protocol, message[1], message[2], message[3], message[4]]);
+                }
+            }
+            if (protocol === 109 /* PEER_REMOTE_SYSTEM_MESSAGE */) {
+                //Protocol.PEER_REMOTE_SYSTEM_MESSAGE, toGottiId, fromPlayerIndex, message.type, message.data, message.to, message.from]);
+                const toClient = this.clientsById[message[1]];
+                if (toClient) {
+                    Protocol_1.send(toClient, [protocol, message[2], message[3], message[4], message[5], message[6]]);
+                }
+            }
+        });
+    }
+    registerAreaMessages(areaChannel) {
+        areaChannel.onMessage((message) => {
+            if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
+                // add from area id
+                // get all listening clients for area/channel
+                const listeningClientUids = areaChannel.listeningClientUids;
+                let numClients = listeningClientUids.length;
+                // iterate through all and relay message
+                message = msgpack.encode(message);
+                while (numClients--) {
+                    const client = this.clientsById[listeningClientUids[numClients]];
+                    Protocol_1.send(client, message, false);
+                }
+            }
+            else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {
+                // [protocol, type, data, to, from, areaIds]
+                const toAreaIds = message[5];
+                // reassign last value in array to the from area id
+                message[5] = areaChannel.channelId;
+                areaChannel.broadcast(message, toAreaIds);
+            }
+            else if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
+                this.masterServerChannel.send([35 /* AREA_TO_MASTER_MESSAGE */, areaChannel.channelId, message[1]]);
+            }
+        });
     }
     async _getInitialWriteArea(client, clientOptions) {
         const write = this.getInitialWriteArea(client, this.areaOptions, clientOptions);
@@ -259,27 +329,60 @@ class Connector extends events_1.EventEmitter {
         }
     }
     _onWebClientMessage(client, message) {
-        message = Protocol_1.decode(message);
-        if (!message) {
+        let decoded = Protocol_1.decode(message);
+        if (!decoded) {
             //    debugAndPrintError(`${this.roomName} (${this.roomId}), couldn't decode message: ${message}`);
             return;
         }
-        if (message[0] === 28 /* SYSTEM_MESSAGE */) {
-            client.channelClient.sendLocal(message);
+        const protocol = decoded[0];
+        if (protocol === 28 /* SYSTEM_MESSAGE */) {
+            //TODO go into my channel lib and make it so you can send encoding as false so we can just forward the encoded message
+            client.channelClient.sendLocal(decoded);
         }
-        else if (message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
-            client.channelClient.sendLocalImmediate(message);
+        else if (protocol === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
+            client.channelClient.sendLocalImmediate(decoded);
         }
-        else if (message[0] === 20 /* GET_INITIAL_CLIENT_AREA_WRITE */) {
-            this._getInitialWriteArea(client, message[1]);
+        else if (protocol === 20 /* GET_INITIAL_CLIENT_AREA_WRITE */) {
+            this._getInitialWriteArea(client, decoded[1]);
         }
-        else if (message[0] === 12 /* LEAVE_CONNECTOR */) {
+        else if (protocol === 109 /* PEER_REMOTE_SYSTEM_MESSAGE */) {
+            //   console.log('Connector _onWebClientMessage handlng PEER_REMOTE_SYSTEM_MESSAGE for peer', decoded[1], 'from player:', client.gottiId);
+            //[Protocol.PEER_REMOTE_SYSTEM_MESSAGE, peerIndex, message.type, message.data, message.to, message.from, playerIndex]);
+            this.relayChannel.send([...decoded, client.playerIndex]);
+        }
+        else if (protocol === 110 /* PEERS_REMOTE_SYSTEM_MESSAGE */) {
+        }
+        else if (protocol === 12 /* LEAVE_CONNECTOR */) {
             // stop interpreting messages from this client
             client.removeAllListeners('message');
             // prevent "onLeave" from being called twice in case the connection is forcibly closed
             client.removeAllListeners('close');
             // only effectively close connection when "onLeave" is fulfilled
             this._onLeave(client, Protocol_1.WS_CLOSE_CONSENTED).then(() => client.close());
+        }
+        else if (protocol === 100 /* CLIENT_WEB_RTC_ENABLED */) {
+            if (this.relayChannel) {
+                // [sdp, ice]
+                console.log('Connector _onWebClientMessage handlng CLIENT_WEB_RTC_ENABLED for client with player index', client.playerIndex);
+                this.relayChannel.send([100 /* CLIENT_WEB_RTC_ENABLED */, client.playerIndex]);
+            }
+        }
+        else if (protocol === 102 /* DISABLED_CLIENT_P2P */) {
+            // [sdp, ice]
+            this.relayChannel.send([102 /* DISABLED_CLIENT_P2P */, client.playerIndex]);
+        }
+        else if (protocol === 111 /* SIGNAL_REQUEST */) {
+            // [protocol, toPlayerIndex, { sdp, candidate }
+            console.log('Connector _onWebClientMessage handlng SIGNAL_REQUEST that should be sent to', decoded[1], 'and from playerIndex:', client.playerIndex, 'the sdp/candidate info was', decoded[2]);
+            this.relayChannel.send([protocol, decoded[1], decoded[2], client.playerIndex, this.relayChannel.frontUid]);
+        }
+        else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
+            console.log('GOT PEER CONNECTION REQUEST BACK FROM CLIENT!!!!!!!!!!!!!! SEND TO RELAY');
+            // protocol, toPlayerIndex, { sdp, candidate }, systemName, options
+            this.relayChannel.send([protocol, decoded[1], decoded[2], decoded[3], decoded[4], client.playerIndex, this.relayChannel.frontUid]);
+        }
+        else if (protocol === 113 /* SIGNAL_FAILED */) {
+            this.relayChannel.send([protocol, message[1], client.playerIndex]);
         }
     }
     async addAreaListen(client, areaId, options) {
@@ -293,9 +396,6 @@ class Connector extends events_1.EventEmitter {
             return true;
         }
         catch (err) {
-            console.log('clientId was:', client.gottiId);
-            console.log('areaId was', areaId);
-            console.log('error in addAreaListen was', err);
             //   console.log('error was', err);
             return false;
         }
@@ -348,13 +448,22 @@ class Connector extends events_1.EventEmitter {
         client.auth = auth;
         client.seatOptions = seatOptions;
         Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, this.areaOptions, joinOptions]);
+        if (this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
+            this.relayChannel.send([10 /* JOIN_CONNECTOR */, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid]);
+        }
+        else {
+            throw new Error('Connector._onJoin is failing because we dont have a relayURI specified! Gotti-Servers v0.2.5 and up require you set up a relay server.');
+        }
         client.on('message', this._onWebClientMessage.bind(this, client));
         client.once('close', this._onLeave.bind(this, client));
     }
     async _onLeave(client, code) {
         // call abstract 'onLeave' method only if the client has been successfully accepted.
+        if (this.relayChannel) {
+            this.relayChannel.send([12 /* LEAVE_CONNECTOR */, client.playerIndex]);
+        }
         if (Util_1.spliceOne(this.clients, this.clients.indexOf(client))) {
-            delete this.clientsById[client.sessionId];
+            delete this.clientsById[client.gottiId];
             // disconnect gotti client too.
             client.channelClient.unlinkChannel();
             //TODO: notify gate server

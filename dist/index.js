@@ -10,3 +10,5 @@ var AreaRoom_1 = require("./AreaRoom");
 exports.AreaRoom = AreaRoom_1.AreaRoom;
 var MasterServer_1 = require("./MasterServer");
 exports.MasterServer = MasterServer_1.MasterServer;
+var RelayServer_1 = require("./RelayServer");
+exports.RelayServer = RelayServer_1.RelayServer;
