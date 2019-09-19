@@ -266,10 +266,10 @@ class Connector extends events_1.EventEmitter {
             else if (protocol === 113 /* SIGNAL_FAILED */) {
                 // [protocol, fromPlayerIndex, toPlayerGottiId, options])
                 const toClient = this.clientsById[message[2]];
-                console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
+                console.log('GOT FAILED PEER CONNECTION REQUEST BACK FROM RELAY');
                 if (toClient) {
-                    // [protocol, fromPlayerIndex]
-                    Protocol_1.send(toClient, [protocol, message[1], message[3]]);
+                    // [protocol, fromPlayerIndex, options?]
+                    Protocol_1.send(toClient, [protocol, message[1], message[2]]);
                 }
             }
             else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
