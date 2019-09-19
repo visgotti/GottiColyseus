@@ -36,6 +36,10 @@ class RelayServer {
                 this.handlePeerConnection(message[1], message[2], message[3], message[4]);
                 //  this.onMessage(message[1]);
             }
+            else if (protocol === 113 /* SIGNAL_FAILED */) {
+                // [protocol, toPlayerIndex, fromPlayerIndex]
+                this.handlePeerFailedConnection(message[1], message[2]);
+            }
             else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
                 console.log('RELAY SERVER IS HANDLING PEER CONNECTION handlePeerConnectionRequest!!!!');
                 // [protocol, toPlayerIndex, { sdp, candidate  }, fromSystemName, requestOptions, fromPlayerIndex, frontUid]
@@ -59,6 +63,9 @@ class RelayServer {
                 };
             }
             else if (protocol === 12 /* LEAVE_CONNECTOR */) {
+                // this.relayChannel.send([Protocol.LEAVE_CONNECTOR, client.playerIndex]);
+                //TODO: since we dont need additional logic we just remove the player index from client map as is
+                // this.handlePlayerDisconnected(message[1]);
                 delete this.clientMap[message[1]];
             }
             else if (protocol === 109 /* PEER_REMOTE_SYSTEM_MESSAGE */) {
@@ -71,6 +78,16 @@ class RelayServer {
                 }
             }
         });
+    }
+    handlePlayerDisconnected(clientIndex) {
+        //TODO keep track of connections and dispatch that signal was lost?
+        delete this.clientMap[clientIndex];
+    }
+    handlePeerFailedConnection(toPlayerIndex, fromPlayerIndex, options) {
+        const toPlayerData = this.clientMap[toPlayerIndex];
+        if (toPlayerData) {
+            this.channel.send([113 /* SIGNAL_FAILED */, fromPlayerIndex, toPlayerData.gottiId], toPlayerData.connectorId);
+        }
     }
     handlePeerConnection(toPlayerIndex, fromPlayerSignalData, fromPlayerIndex, connectorId) {
         //   console.log('RelayServer SIGNAL_REQUEST > handlePeerConnection , toPlayerIndex was:', toPlayerIndex, 'fromPlayerSignalData:', fromPlayerSignalData, 'fromPlayerIndex: ', fromPlayerIndex, 'connectorId:', connectorId);
@@ -95,11 +112,9 @@ class RelayServer {
         if (playersExistInMap) {
             playersAreBothP2PEnabled = this.clientMap[fromPlayerIndex].p2p && this.clientMap[toPlayerIndex].p2p;
         }
-        console.log('RELAY SERVER PEER CONNECTION handlePeerConnectionRequest!!!!');
         if (playersExistInMap && playersAreBothP2PEnabled) {
             let { connectorId, gottiId, } = this.clientMap[toPlayerIndex];
             const toPlayerData = { gottiId, connectorId };
-            console.log('SENDING PEER CONNECTION REQUEST BACK FROM RELA CAUSE IT WAS SUCC!!!!');
             this.channel.send([114 /* PEER_CONNECTION_REQUEST */, fromPlayerIndex, fromPlayerSignalData, systemName, requestOptions, toPlayerData.gottiId], toPlayerData.connectorId);
         }
         else {

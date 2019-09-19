@@ -14,6 +14,8 @@ export declare class RelayServer {
     private clientMap;
     constructor(options: RelayServerOptions);
     private registerBackChannelMessages;
+    private handlePlayerDisconnected;
+    private handlePeerFailedConnection;
     private handlePeerConnection;
     private handlePeerConnectionRequest;
 }

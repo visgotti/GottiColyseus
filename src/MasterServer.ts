@@ -37,7 +37,7 @@ export abstract class MasterServer {
      * sends message to an area that can be handled in any systems onMasterMessage
      * @param message
      */
-    public dispatchToAreas(message){
+    public dispatchToAreas(message: any){
         this.channel.broadcast([Protocol.MASTER_TO_AREA_BROADCAST, message])
     }
 

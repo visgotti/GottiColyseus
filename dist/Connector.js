@@ -232,7 +232,7 @@ class Connector extends events_1.EventEmitter {
                 if (message[0] === 36 /* MASTER_TO_AREA_BROADCAST */) {
                     //TODO: the only way to broadcast to all area rooms right now is through an area front channel since the masterServerChannel doesnt know about the areas
                     // we should probably try and keep the area front channels sorted by clients in them so we can use most optimized one to make the dispatches
-                    this.channels[this.areaRoomIds[0]].broadcast(message[1], this.areaRoomIds);
+                    this.channels[this.areaRoomIds[0]].broadcast(message, this.areaRoomIds);
                 }
                 else {
                     this.onMasterMessage && this.onMasterMessage(message);
@@ -261,6 +261,15 @@ class Connector extends events_1.EventEmitter {
                 if (toClient) {
                     // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
                     Protocol_1.send(toClient, [protocol, message[1], message[2]]);
+                }
+            }
+            else if (protocol === 113 /* SIGNAL_FAILED */) {
+                // [protocol, fromPlayerIndex, toPlayerGottiId, options])
+                const toClient = this.clientsById[message[2]];
+                console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
+                if (toClient) {
+                    // [protocol, fromPlayerIndex]
+                    Protocol_1.send(toClient, [protocol, message[1], message[3]]);
                 }
             }
             else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
@@ -327,6 +336,7 @@ class Connector extends events_1.EventEmitter {
         }
         const protocol = decoded[0];
         if (protocol === 28 /* SYSTEM_MESSAGE */) {
+            //TODO go into my channel lib and make it so you can send encoding as false so we can just forward the encoded message
             client.channelClient.sendLocal(decoded);
         }
         else if (protocol === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
@@ -370,6 +380,9 @@ class Connector extends events_1.EventEmitter {
             console.log('GOT PEER CONNECTION REQUEST BACK FROM CLIENT!!!!!!!!!!!!!! SEND TO RELAY');
             // protocol, toPlayerIndex, { sdp, candidate }, systemName, options
             this.relayChannel.send([protocol, decoded[1], decoded[2], decoded[3], decoded[4], client.playerIndex, this.relayChannel.frontUid]);
+        }
+        else if (protocol === 113 /* SIGNAL_FAILED */) {
+            this.relayChannel.send([protocol, message[1], client.playerIndex]);
         }
     }
     async addAreaListen(client, areaId, options) {
@@ -447,7 +460,7 @@ class Connector extends events_1.EventEmitter {
     async _onLeave(client, code) {
         // call abstract 'onLeave' method only if the client has been successfully accepted.
         if (this.relayChannel) {
-            this.relayChannel.send([12 /* LEAVE_CONNECTOR */, client.playerIndex, client.playerIndex]);
+            this.relayChannel.send([12 /* LEAVE_CONNECTOR */, client.playerIndex]);
         }
         if (Util_1.spliceOne(this.clients, this.clients.indexOf(client))) {
             delete this.clientsById[client.gottiId];

@@ -181,7 +181,7 @@ export abstract class Connector extends EventEmitter {
             client.p2p_capable = query.isWebRTCSupported;
 
             client.gottiId = req.gottiId;
-            client.playerIndex = this.reservedSeats[req.gottiId].playerIndex
+            client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
             this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
         }
 
@@ -361,7 +361,7 @@ export abstract class Connector extends EventEmitter {
                 if(message[0] === Protocol.MASTER_TO_AREA_BROADCAST){
                     //TODO: the only way to broadcast to all area rooms right now is through an area front channel since the masterServerChannel doesnt know about the areas
                     // we should probably try and keep the area front channels sorted by clients in them so we can use most optimized one to make the dispatches
-                    this.channels[this.areaRoomIds[0]].broadcast(message[1], this.areaRoomIds);
+                    this.channels[this.areaRoomIds[0]].broadcast(message, this.areaRoomIds);
                 } else {
                     this.onMasterMessage && this.onMasterMessage(message);
                 }
@@ -391,7 +391,16 @@ export abstract class Connector extends EventEmitter {
                     // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
                     send(toClient, [protocol, message[1], message[2]]);
                 }
-            }else if(protocol === Protocol.PEER_CONNECTION_REQUEST) {
+            } else if (protocol === Protocol.SIGNAL_FAILED) {
+                // [protocol, fromPlayerIndex, toPlayerGottiId, options])
+                const toClient = this.clientsById[message[2]];
+                console.log('GOT FAILED PEER CONNECTION REQUEST BACK FROM RELAY');
+                if(toClient) {
+                    // [protocol, fromPlayerIndex, options?]
+                    send(toClient, [protocol, message[1], message[2]]);
+                }
+            }
+            else if(protocol === Protocol.PEER_CONNECTION_REQUEST) {
                 //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, systemName, requestOptions, toPlayerrGottiId], toPlayerData.connectorId)
                 const toClient = this.clientsById[message[5]];
                 console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
@@ -457,6 +466,7 @@ export abstract class Connector extends EventEmitter {
         const protocol = decoded[0];
 
         if (protocol === Protocol.SYSTEM_MESSAGE) {
+            //TODO go into my channel lib and make it so you can send encoding as false so we can just forward the encoded message
             client.channelClient.sendLocal(decoded);
         } else if(protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
             client.channelClient.sendLocalImmediate(decoded);
@@ -489,10 +499,12 @@ export abstract class Connector extends EventEmitter {
                 // [protocol, toPlayerIndex, { sdp, candidate }
             console.log('Connector _onWebClientMessage handlng SIGNAL_REQUEST that should be sent to', decoded[1], 'and from playerIndex:', client.playerIndex, 'the sdp/candidate info was', decoded[2]);
             this.relayChannel.send([protocol, decoded[1], decoded[2], client.playerIndex, this.relayChannel.frontUid]);
-        }else if(protocol === Protocol.PEER_CONNECTION_REQUEST) {
+        } else if(protocol === Protocol.PEER_CONNECTION_REQUEST) {
             console.log('GOT PEER CONNECTION REQUEST BACK FROM CLIENT!!!!!!!!!!!!!! SEND TO RELAY');
             // protocol, toPlayerIndex, { sdp, candidate }, systemName, options
             this.relayChannel.send([protocol, decoded[1], decoded[2], decoded[3], decoded[4], client.playerIndex, this.relayChannel.frontUid]);
+        } else if(protocol === Protocol.SIGNAL_FAILED) {
+            this.relayChannel.send([protocol, message[1], client.playerIndex]);
         }
     }
 
@@ -583,7 +595,7 @@ export abstract class Connector extends EventEmitter {
     private async _onLeave(client: Client, code?: number): Promise<any> {
         // call abstract 'onLeave' method only if the client has been successfully accepted.
         if(this.relayChannel) {
-            this.relayChannel.send([Protocol.LEAVE_CONNECTOR, client.playerIndex, client.playerIndex]);
+            this.relayChannel.send([Protocol.LEAVE_CONNECTOR, client.playerIndex]);
         }
 
         if (spliceOne(this.clients, this.clients.indexOf(client))) {
