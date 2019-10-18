@@ -7,7 +7,6 @@ import { AreaClient as Client } from './AreaClient';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
 
-
 export enum LISTEN_REQUEST_FROM {
     SERVER,
     CLIENT,

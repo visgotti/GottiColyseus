@@ -1,6 +1,6 @@
 export { Gate } from './Gate';
-export { Connector } from './Connector';
-export { AreaServer } from './AreaServer';
+export { Connector, ConnectorOptions } from './Connector';
+export { AreaServer, AreaServerOptions, AreaOption } from './AreaServer';
 export { AreaRoom } from './AreaRoom';
 export { MasterServer } from './MasterServer';
 export { Config } from './Config';

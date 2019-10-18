@@ -277,18 +277,22 @@ export class Gate {
         return availableData;
     }
 
-    public gateKeep(req, res) {
-        if(this.onGateKeepHandler(req, res)) {
-            res.status(200).json({ games: this.getPublicGateData() })
+    public async gateKeep(req, res) {
+        const authed = await Promise.resolve(this.onGateKeepHandler(req, res));
+        if(authed) {
+            return res.status(200).json({ games: this.getPublicGateData() })
         } else {
-            res.status(401).json('Error authenticating');
+            return res.status(401).json('Error authenticating');
         }
     }
+
     public registerGateKeep(handler: (request, response) => any) {
         this.onGateKeepHandler = handler;
         this.onGateKeepHandler = this.onGateKeepHandler.bind(this);
     }
+
     private onGateKeepHandler(req, res) : any {
+        console.warn('Currently always returning true for your gateKeep function, please specify a gateKeep(req,res) handler in Gate.js for custom gate keeping.')
         return true
     }
 

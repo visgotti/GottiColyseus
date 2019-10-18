@@ -248,7 +248,6 @@ export abstract class Connector extends EventEmitter {
     public onJoin?(client: Client): any | Promise<any>;
     public onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     public onDispose?(): void | Promise<any>;
-    public onAuth?(options: any): boolean;
 
     /**
      * @param auth - authentication data sent from Gate server.
