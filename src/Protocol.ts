@@ -85,6 +85,7 @@ export const enum GateProtocol {
     // Gate Communication 61-70
     RESERVE_PLAYER_SEAT = '1',
     HEARTBEAT = '2',
+    RESERVE_AUTHENTICATION = '3',
 }
 
 export enum StateProtocol {

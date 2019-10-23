@@ -1,4 +1,4 @@
-import { Messenger as Requester, Broker } from 'gotti-reqres/dist';
+import { Messenger, Broker } from 'gotti-reqres/dist';
 import { GateProtocol, GOTTI_GATE_CHANNEL_PREFIX } from './Protocol';
 import { sortByProperty, generateId } from './Util';
 
@@ -37,6 +37,9 @@ export type ClientConnectorLookup = Map<string, number>;
 
 export class Gate {
     public urls = [];
+
+    private _authenticationHandler: Function;
+
     private connectorsByServerIndex: { [serverIndex: number]: ConnectorData } = {};
 
     // used for reconnections
@@ -46,7 +49,8 @@ export class Gate {
     private gamesById: { [id: string]: GameData} = {};
 
     private requestBroker: Broker;
-    private requester: Requester;
+    private requester: Messenger;
+    private responder: Messenger;
 
     private availableGamesByType: { [type: string]: {[id: string]: GameData } } = {};
     private unavailableGamesById: { [id: string]: GameData } = {};
@@ -54,7 +58,11 @@ export class Gate {
 
     private playerIndex: number = 0;
 
+    private authMap: Map<string, any> = new Map();
+
     private heartbeat: NodeJS.Timer = null;
+
+    private authTimeout: number = 1000 * 60 * 60 * 12; // 12 hours
 
     private makeGameAvailable(gameId: string) : boolean {
         if(gameId in this.unavailableGamesById) {
@@ -80,12 +88,25 @@ export class Gate {
         this.gameRequested = this.gameRequested.bind(this);
         this.requestBroker = new Broker(gateURI, 'gate');
 
-        this.requester = new Requester({
+        this.requester = new Messenger({
             id: 'gate_requester',
             brokerURI: gateURI,
             request: { timeout: 1000 }
         });
+        this.responder = new Messenger({
+            id: 'gate_responder',
+            brokerURI: gateURI,
+            request: { timeout: 1000 }
+        })
         //TODO: initialize subscriber socket
+    }
+
+    public onAuthentication(onAuthHandler) {
+        this._authenticationHandler = onAuthHandler.bind(this);
+    }
+
+    public authenticationHandler(req, res) {
+
     }
 
     public defineMatchMaker(gameType, MatchMakerFunction) {
@@ -120,7 +141,7 @@ export class Gate {
             this.pendingClients[tempId] = auth;
 
             let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, seatOptions });
-            console.log('the result was', result);
+
             if(result && result.gottiId) {
                 this.pendingClients.delete(tempId);
                 this.connectedClients.set(result.gottiId, connectorServerIndex);
@@ -277,6 +298,10 @@ export class Gate {
         return availableData;
     }
 
+    public async authenticate(authOptions) {
+
+    }
+
     public async gateKeep(req, res) {
         const authed = await Promise.resolve(this.onGateKeepHandler(req, res));
         if(authed) {
@@ -415,6 +440,27 @@ export class Gate {
     }
     */
 
+    private registerAuthResponders() {
+        this.responder.createResponse(GOTTI_GATE_CHANNEL_PREFIX + '-' + GateProtocol.RESERVE_AUTHENTICATION, (data) => {
+            const { auth, pastAuthId } = data;
+            if(pastAuthId) {
+                const past = this.authMap.get(pastAuthId);
+                if(past) {
+                    clearTimeout(past.timeout);
+                    this.authMap.delete(pastAuthId);
+                }
+            }
+
+            const newAuthKey = generateId(9);
+            this.authMap.set(newAuthKey, {
+                auth,
+                timeout: setTimeout(() => {
+                    this.authMap.delete(pastAuthId);
+                }, this.authTimeout)
+            })
+        });
+    }
+
     private getClientCountOnConnector(serverIndex) {
         return this.connectorsByServerIndex[serverIndex].connectedClients;
     }
@@ -427,6 +473,9 @@ export class Gate {
         if(this.requester) {
             this.requester.close();
             this.requestBroker.close();
+        }
+        if(this.responder) {
+            this.responder.close();
         }
     }
 }

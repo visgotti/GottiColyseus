@@ -75,7 +75,9 @@ export function parseQueryString(query: string): any {
 
     return data;
 }
-export function generateId() { return nanoid(9); }
+export function generateId(len=9) {
+    return nanoid(len);
+}
 
 export function merge(a: any, ...objs: any[]): any {
     for (let i = 0, len = objs.length; i < len; i++) {
