@@ -1,5 +1,5 @@
 import { Messenger, Broker } from 'gotti-reqres/dist';
-import { GateProtocol, GOTTI_GATE_CHANNEL_PREFIX } from './Protocol';
+import { GateProtocol, GOTTI_GATE_CHANNEL_PREFIX, GOTTI_GET_GAMES_OPTIONS, GOTTI_GATE_AUTH_ID } from './Protocol';
 import { sortByProperty, generateId } from './Util';
 
 export interface ConnectorData {
@@ -52,6 +52,8 @@ export class Gate {
     private requester: Messenger;
     private responder: Messenger;
 
+    readonly redisURI: string;
+
     private availableGamesByType: { [type: string]: {[id: string]: GameData } } = {};
     private unavailableGamesById: { [id: string]: GameData } = {};
     private matchMakersByGameType: Map<string, any> = new Map();
@@ -83,7 +85,7 @@ export class Gate {
         return false;
     }
 
-    constructor(gateURI) {
+    constructor(gateURI, redisURI?) {
         this.gateKeep = this.gateKeep.bind(this);
         this.gameRequested = this.gameRequested.bind(this);
         this.requestBroker = new Broker(gateURI, 'gate');
@@ -93,12 +95,19 @@ export class Gate {
             brokerURI: gateURI,
             request: { timeout: 1000 }
         });
+
         this.responder = new Messenger({
             id: 'gate_responder',
             brokerURI: gateURI,
             request: { timeout: 1000 }
         })
         //TODO: initialize subscriber socket
+    }
+
+    public getPlayerAuth(authId) {
+        const auth = this.authMap.get(authId);
+        if(auth) return auth.auth;
+        return null;
     }
 
     public onAuthentication(onAuthHandler) {
@@ -156,7 +165,6 @@ export class Gate {
                 this.pendingClients.delete(tempId);
                 throw new Error('Invalid response from connector room. Failed to connect.');
             }
-
         } catch(err) {
             console.log('error was', err);
             this.pendingClients.delete(tempId);
@@ -219,8 +227,6 @@ export class Gate {
         return this.connectorsByServerIndex[serverIndex];
     }
 
-
-
     /**
      * Handles the request from a player for a certain game type. needs work
      * right now the reuest has gameId and then the gate server will
@@ -230,22 +236,28 @@ export class Gate {
      * @returns {Response|undefined}
      */
     public async gameRequested(req, res) {
-        if(!(req.auth)) {
-            return res.status(500).json({ error: 'unauthenticated' });
+        const authId = req.body[GOTTI_GATE_AUTH_ID];
+        if(!authId) {
+            return res.status(401).json({ error: 'Error with authentication' })
         }
+        const clientAuth = this.getPlayerAuth(authId);
 
+        if(!clientAuth) {
+            return res.status(401).json({ error: 'Error with authentication' })
+        }
+        const clientOptions = req.body[GOTTI_GET_GAMES_OPTIONS];
         const validated = this.validateGameRequest(req);
 
         if(validated.error) {
             return res.status(validated.code).json(validated.error);
         }
 
-        const { auth, options, gameType } = validated;
+        const { gameType } = validated;
 
-        const { host, port, gottiId, playerIndex } = await this.matchMake(gameType, auth, options);
+        const { host, port, gottiId, playerIndex } = await this.matchMake(gameType, clientAuth, clientOptions, req);
 
         if(host && port) {
-            return res.status(200).json({ host, port, gottiId, playerIndex });
+            return res.status(200).json({ host, port, gottiId, playerIndex, clientId: playerIndex });
         } else {
             return res.status(500).json('Invalid request');
         }
@@ -255,10 +267,10 @@ export class Gate {
      *
      * @param gameType - type of game requested
      * @param auth - user authentication data
-     * @param clientOptions - additional data about game request sent from client
+     * @param clientJoinOptions - additional data about game request sent from client
      * @returns {{host, port, gottiId}}
      */
-    private async matchMake(gameType, auth?, clientOptions?) : Promise<any> {
+    private async matchMake(gameType, auth, clientJoinOptions, req) : Promise<any> {
         try {
             const definedMatchMaker = this.matchMakersByGameType.get(gameType);
 
@@ -268,7 +280,7 @@ export class Gate {
 
             const availableGames = this.availableGamesByType[gameType];
 
-            const { gameId, seatOptions } = definedMatchMaker(availableGames, auth, clientOptions);
+            const { gameId, joinOptions } = definedMatchMaker(availableGames, auth, clientJoinOptions, req);
 
             if(!(gameId in this.gamesById)) {
                 throw `match maker gave gameId: ${gameId} which is not a valid game id.`;
@@ -278,7 +290,7 @@ export class Gate {
 
             console.log('the connector data was', connectorData);
 
-            const { host, port, gottiId, playerIndex } = await this.addPlayerToConnector(connectorData.serverIndex, auth, seatOptions);
+            const { host, port, gottiId, playerIndex } = await this.addPlayerToConnector(connectorData.serverIndex, auth, joinOptions);
             return { host, port, gottiId, playerIndex };
         } catch (err) {
             throw err;
@@ -298,17 +310,28 @@ export class Gate {
         return availableData;
     }
 
-    public async authenticate(authOptions) {
-
-    }
-
     public async gateKeep(req, res) {
-        const authed = await Promise.resolve(this.onGateKeepHandler(req, res));
-        if(authed) {
-            return res.status(200).json({ games: this.getPublicGateData() })
-        } else {
-            return res.status(401).json('Error authenticating');
+        const clientOptions = req.body[GOTTI_GET_GAMES_OPTIONS];
+        const authId = req.body[GOTTI_GATE_AUTH_ID];
+        if(!authId) {
+            return res.status(401).json('Error with authentication')
         }
+        const clientAuth = this.getPlayerAuth(authId);
+        if(!clientAuth) {
+            return res.status(401).json('Error with authentication')
+        }
+        try {
+            const returnOptions = await this.onGateKeepHandler(this.getPublicGateData(), clientAuth, clientOptions, req);
+            if(returnOptions) {
+                return res.status(200).json({ games: this.getPublicGateData() })
+            } else {
+                return res.status(401).json('Error authenticating');
+            }
+        } catch(err) {
+            let errMsg = err.message ? err.message : "Error authenticating";
+            return res.status(401).json(errMsg);
+        }
+
     }
 
     public registerGateKeep(handler: (request, response) => any) {
@@ -316,7 +339,7 @@ export class Gate {
         this.onGateKeepHandler = this.onGateKeepHandler.bind(this);
     }
 
-    private onGateKeepHandler(req, res) : any {
+    private onGateKeepHandler(gamesData, auth, clientOptions, req) : any {
         console.warn('Currently always returning true for your gateKeep function, please specify a gateKeep(req,res) handler in Gate.js for custom gate keeping.')
         return true
     }
@@ -325,7 +348,7 @@ export class Gate {
         if(!(req.body) || !(req.body['gameType'] || !(req.body['gameType'] in this.availableGamesByType))) {
             return { error: 'Bad request', code: 400 }
         }
-        return { gameType: req.body.gameType, options: req.body.options, auth: req.auth };
+        return { gameType: req.body.gameType  };
     }
 
     // gets connector for game type

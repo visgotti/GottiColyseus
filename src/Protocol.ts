@@ -93,6 +93,18 @@ export enum StateProtocol {
     PATCH = 1
 }
 
+export const GOTTI_HTTP_ROUTES = {
+    AUTHENTICATE: 'gotti_authenticate',
+    REGISTER: 'gotti_register',
+    GET_GAMES: 'gotti_games',
+    JOIN_GAME: 'gotti_join_game'
+}
+
+export const GOTTI_ROUTE_BODY_PAYLOAD = '__GOTTI_ROUTE_BODY_PAYLOAD__';
+export const GOTTI_GET_GAMES_OPTIONS = '__GOTTI_GET_GAMES_OPTIONS__';
+export const GOTTI_AUTH_KEY = '__GOTTI_AUTH_KEY__';
+export const GOTTI_GATE_AUTH_ID = '__GOTTI_AUTH_ID__';
+
 export const GOTTI_GATE_CHANNEL_PREFIX = '__GOTTI_GATE_CHANNEL__';
 
 export const GOTTI_MASTER_CHANNEL_ID = '__GOTTI_MASTER_CHANNEL__';
