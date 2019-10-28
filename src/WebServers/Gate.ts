@@ -9,11 +9,18 @@ const helmet = require('helmet');
 import { generateId } from "../Util";
 import { Messenger } from 'gotti-reqres/dist';
 
-import {GateProtocol, GOTTI_HTTP_ROUTES, GOTTI_GATE_CHANNEL_PREFIX, GOTTI_GATE_AUTH_ID, GOTTI_AUTH_KEY } from "../Protocol";
+import {
+    GateProtocol,
+    GOTTI_HTTP_ROUTES,
+    GOTTI_GATE_CHANNEL_PREFIX,
+    GOTTI_GATE_AUTH_ID,
+    GOTTI_AUTH_KEY,
+    GOTTI_ROUTE_BODY_PAYLOAD
+} from "../Protocol";
 
 import { Gate } from '../Gate';
 
-export class GateWebServer extends BaseWebServer {
+export class GateWebServer extends BaseWebServer{
     public app: any;
     private server: any;
     private onAuthHandler: Function;
@@ -30,6 +37,30 @@ export class GateWebServer extends BaseWebServer {
         this.port = port;
     }
 
+    addHandler(route, handler) {
+        if(!this.app) {
+            throw new Error('Cannot add route since theres no express server initialized on web server')
+        }
+        this.app.post(route, async (req, res) => {
+            try {
+                const authId = req.body[GOTTI_GATE_AUTH_ID];
+                const auth = await this.gate.getPlayerAuth(authId);
+                if(!auth) {
+                    return res.status(503).json({ error: 'not authenticated' });
+                }
+                const responseObject = await handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], this.gate.publicGateData, auth);
+                return res.json(responseObject);
+            } catch (err) {
+                const msg = err.message ? err.message : err;
+                return res.status(401).json({ error: msg });
+            }
+        })
+    }
+
+    registerOnGetGames(handler) {
+        this.gate.registerGateKeep(handler)
+    }
+
     public async init(app?) {
         if(app) {
             this.app = app;
@@ -42,45 +73,8 @@ export class GateWebServer extends BaseWebServer {
             this.app.use(bodyParser.json({type: 'application/json'}));
             this.server = this.app.listen(this.port);
         }
-        this.app.post(GOTTI_HTTP_ROUTES.GET_GAMES, this.gate.gateKeep.bind(this.gate));
-        this.app.post(GOTTI_HTTP_ROUTES.JOIN_GAME, this.gate.gameRequested.bind(this.gate));
+        this.app.post(`${GOTTI_HTTP_ROUTES.BASE_GATE}${GOTTI_HTTP_ROUTES.GET_GAMES}`, this.gate.gateKeep.bind(this.gate));
+        this.app.post(`${GOTTI_HTTP_ROUTES.BASE_GATE}${GOTTI_HTTP_ROUTES.JOIN_GAME}`, this.gate.gameRequested.bind(this.gate));
         return true;
-    }
-
-    private handleJoinGame(req, res) {
-    }
-
-    public addOnAuth(handler) {
-        this.onAuthHandler = handler;
-    }
-
-    public onGateKeep() {
-
-    }
-
-    public async onAuth(req, res) {
-        if(this.onAuthHandler) {
-            try {
-                const auth = await this.onAuthHandler(req[GOTTI_AUTH_KEY], req);
-                if(!auth) {
-                    return res.send(503)
-                }
-                const authId = await this.reserveGateRequest({
-                    auth,
-                });
-                if(authId) {
-                    return res.json({
-                        [GOTTI_GATE_AUTH_ID]: authId,
-                        [GOTTI_AUTH_KEY]: auth,
-                    })
-                } else {
-                    return res.send(503)
-                }
-            } catch(err) {
-                return res.send(503);
-            }
-        } else {
-            return res.send('onAuth was not handled');
-        }
     }
 }

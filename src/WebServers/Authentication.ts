@@ -6,7 +6,14 @@ import { Messenger } from 'gotti-reqres/dist';
 
 import { BaseWebServer } from "./Base";
 
-import {GateProtocol, GOTTI_GATE_CHANNEL_PREFIX, GOTTI_GATE_AUTH_ID, GOTTI_AUTH_KEY, GOTTI_HTTP_ROUTES} from "../Protocol";
+import {
+    GateProtocol,
+    GOTTI_GATE_CHANNEL_PREFIX,
+    GOTTI_GATE_AUTH_ID,
+    GOTTI_AUTH_KEY,
+    GOTTI_HTTP_ROUTES,
+    GOTTI_ROUTE_BODY_PAYLOAD
+} from "../Protocol";
 
 export class Authentication extends BaseWebServer {
     public app: any;
@@ -45,9 +52,10 @@ export class Authentication extends BaseWebServer {
         }
 
         const reqName = GOTTI_GATE_CHANNEL_PREFIX + '-' + GateProtocol.RESERVE_AUTHENTICATION;
-        this.requester.createRequest(reqName, 'gate_requester');
+        this.requester.createRequest(reqName, 'gate_responder');
         this.reserveGateRequest = this.requester.requests[reqName].bind(this);
-        this.app.post(GOTTI_HTTP_ROUTES.AUTHENTICATE, this.onAuth.bind(this));
+        this.app.post(`${GOTTI_HTTP_ROUTES.BASE_AUTH}${GOTTI_HTTP_ROUTES.AUTHENTICATE}`, this.onAuth.bind(this));
+        this.app.post(`${GOTTI_HTTP_ROUTES.BASE_AUTH}${GOTTI_HTTP_ROUTES.REGISTER}`, this.onRegister.bind(this));
         return true;
     }
 
@@ -58,10 +66,36 @@ export class Authentication extends BaseWebServer {
         this.onRegisterHandler = handler;
     }
 
+    private async setClientAuth(req, authObject) {
+        const oldAuthId = req.body[GOTTI_GATE_AUTH_ID];
+        const newAuthId = await this.reserveGateRequest({
+            auth: authObject,
+            oldAuthId
+        });
+        req['GOTTI_AUTH'] = {
+            [GOTTI_GATE_AUTH_ID]: newAuthId,
+            [GOTTI_AUTH_KEY]: authObject
+        };
+        return authObject;
+    }
+
+    public addHandler(route, handler) {
+        if(!this.app) {
+            throw new Error('Cannot add route since theres no express server initialized on web server')
+        }
+        this.app.post(route, async (req, res) => {
+            return Promise.resolve(handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], this.setClientAuth.bind(this, req))).then((responseObject) => {
+                return res.json({ responseObject, 'GOTTI_AUTH': req['GOTTI_AUTH'] });
+            }).catch(err => {
+                return res.json({error: err})
+            })
+        })
+    }
+
     public async onRegister(req, res) {
         if(this.onRegisterHandler) {
             try {
-                const auth = await this.onRegisterHandler(req[GOTTI_AUTH_KEY], req);
+                const auth = await this.onRegisterHandler(req.body[GOTTI_AUTH_KEY], req);
                 if(!auth) {
                     return res.send(503)
                 }
@@ -87,15 +121,18 @@ export class Authentication extends BaseWebServer {
     public async onAuth(req, res) {
         if(this.onAuthHandler) {
             try {
-                const auth = await this.onAuthHandler(req[GOTTI_AUTH_KEY], req);
+                const oldAuthId = req.body[GOTTI_GATE_AUTH_ID];
+
+                const auth = await this.onAuthHandler(req.body[GOTTI_AUTH_KEY], req);
                 if(!auth) {
                     return res.send(503)
                 }
                 const authId = await this.reserveGateRequest({
                     auth,
+                    oldAuthId
                 });
                 if(authId) {
-                    return res.json({
+                    return res.send(200).json({
                         [GOTTI_GATE_AUTH_ID]: authId,
                         [GOTTI_AUTH_KEY]: auth,
                     })
