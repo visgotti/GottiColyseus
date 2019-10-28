@@ -86,6 +86,7 @@ export const enum GateProtocol {
     RESERVE_PLAYER_SEAT = '1',
     HEARTBEAT = '2',
     RESERVE_AUTHENTICATION = '3',
+    GET_AUTHENTICATION = '4',
 }
 
 export enum StateProtocol {
@@ -94,10 +95,12 @@ export enum StateProtocol {
 }
 
 export const GOTTI_HTTP_ROUTES = {
-    AUTHENTICATE: 'gotti_authenticate',
-    REGISTER: 'gotti_register',
-    GET_GAMES: 'gotti_games',
-    JOIN_GAME: 'gotti_join_game'
+    BASE_AUTH: '/gotti_auth',
+    AUTHENTICATE: '/gotti_authenticate',
+    REGISTER: '/gotti_register',
+    BASE_GATE: 'gotti_gate',
+    GET_GAMES: '/gotti_games',
+    JOIN_GAME: '/gotti_join_game'
 }
 
 export const GOTTI_ROUTE_BODY_PAYLOAD = '__GOTTI_ROUTE_BODY_PAYLOAD__';
