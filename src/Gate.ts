@@ -70,6 +70,7 @@ export class Gate {
         if(gameId in this.unavailableGamesById) {
             const gameData = this.unavailableGamesById[gameId];
             this.availableGamesByType[gameData.type][gameId] = gameData;
+            this.publicGateDataChanged = true;
             delete this.unavailableGamesById[gameId];
             return true;
         }
@@ -80,10 +81,14 @@ export class Gate {
         if(gameData && this.availableGamesByType[gameData.type] && this.availableGamesByType[gameData.type][gameId]) {
             this.unavailableGamesById[gameId] = gameData;
             delete this.availableGamesByType[gameData.type][gameId];
+            this.publicGateDataChanged = true;
             return true;
         }
         return false;
     }
+
+    private _publicGateData: any = {};
+    private publicGateDataChanged = true;
 
     constructor(gateURI, redisURI?) {
         this.gateKeep = this.gateKeep.bind(this);
@@ -99,12 +104,15 @@ export class Gate {
         this.responder = new Messenger({
             id: 'gate_responder',
             brokerURI: gateURI,
-            request: { timeout: 1000 }
+            response: true
         })
+
+        this.registerAuthResponders();
+
         //TODO: initialize subscriber socket
     }
 
-    public getPlayerAuth(authId) {
+    public async getPlayerAuth(authId) {
         const auth = this.authMap.get(authId);
         if(auth) return auth.auth;
         return null;
@@ -197,6 +205,7 @@ export class Gate {
             this.availableGamesByType[gameType] = {};
         }
         this.availableGamesByType[gameType][gameId] = this.gamesById[gameId];
+        this.publicGateDataChanged = true;
     }
 
 
@@ -238,12 +247,12 @@ export class Gate {
     public async gameRequested(req, res) {
         const authId = req.body[GOTTI_GATE_AUTH_ID];
         if(!authId) {
-            return res.status(401).json({ error: 'Error with authentication' })
+            return res.status(401).json({ error: 'Error with authentication' });
         }
-        const clientAuth = this.getPlayerAuth(authId);
+        const clientAuth = await this.getPlayerAuth(authId);
 
         if(!clientAuth) {
-            return res.status(401).json({ error: 'Error with authentication' })
+            return res.status(401).json({ error: 'Error with authentication' });
         }
         const clientOptions = req.body[GOTTI_GET_GAMES_OPTIONS];
         const validated = this.validateGameRequest(req);
@@ -297,7 +306,15 @@ export class Gate {
         }
     }
 
-    private getPublicGateData() {
+    get publicGateData() {
+        if(this.publicGateDataChanged) {
+            this._publicGateData = this.makePublicGateData();
+            this.publicGateDataChanged = false;
+        }
+        return this._publicGateData;
+    }
+
+    private makePublicGateData() {
         let availableData = {};
         for(let key in this.availableGamesByType) {
             availableData[key] = {};
@@ -316,14 +333,14 @@ export class Gate {
         if(!authId) {
             return res.status(401).json('Error with authentication')
         }
-        const clientAuth = this.getPlayerAuth(authId);
+        const clientAuth = await this.getPlayerAuth(authId);
         if(!clientAuth) {
             return res.status(401).json('Error with authentication')
         }
         try {
-            const returnOptions = await this.onGateKeepHandler(this.getPublicGateData(), clientAuth, clientOptions, req);
+            const returnOptions = await this.onGateKeepHandler(clientOptions, this.publicGateData, clientAuth, req);
             if(returnOptions) {
-                return res.status(200).json({ games: this.getPublicGateData() })
+                return res.status(200).json(returnOptions);
             } else {
                 return res.status(401).json('Error authenticating');
             }
@@ -331,7 +348,6 @@ export class Gate {
             let errMsg = err.message ? err.message : "Error authenticating";
             return res.status(401).json(errMsg);
         }
-
     }
 
     public registerGateKeep(handler: (request, response) => any) {
@@ -339,9 +355,9 @@ export class Gate {
         this.onGateKeepHandler = this.onGateKeepHandler.bind(this);
     }
 
-    private onGateKeepHandler(gamesData, auth, clientOptions, req) : any {
+    private onGateKeepHandler(availableGames, auth, clientOptions, req) : any {
         console.warn('Currently always returning true for your gateKeep function, please specify a gateKeep(req,res) handler in Gate.js for custom gate keeping.')
-        return true
+        return availableGames
     }
 
     private validateGameRequest(req) : any {
@@ -389,6 +405,7 @@ export class Gate {
         //sorts
         this.gamesById[connectorData.gameId].connectorsData.sort(sortByProperty('connectedClients'))
     }
+
 
     public startConnectorHeartbeat(interval=100000) {
         if(this.heartbeat) {
@@ -465,12 +482,12 @@ export class Gate {
 
     private registerAuthResponders() {
         this.responder.createResponse(GOTTI_GATE_CHANNEL_PREFIX + '-' + GateProtocol.RESERVE_AUTHENTICATION, (data) => {
-            const { auth, pastAuthId } = data;
-            if(pastAuthId) {
-                const past = this.authMap.get(pastAuthId);
-                if(past) {
-                    clearTimeout(past.timeout);
-                    this.authMap.delete(pastAuthId);
+            const { auth, oldAuthId } = data;
+            if(oldAuthId) {
+                const old = this.authMap.get(oldAuthId);
+                if(old) {
+                    clearTimeout(old.timeout);
+                    this.authMap.delete(oldAuthId);
                 }
             }
 
@@ -478,10 +495,36 @@ export class Gate {
             this.authMap.set(newAuthKey, {
                 auth,
                 timeout: setTimeout(() => {
-                    this.authMap.delete(pastAuthId);
+                    this.authMap.delete(newAuthKey);
                 }, this.authTimeout)
             })
         });
+    }
+
+    public getConnectorsByGameId(gameId) {
+        return this.gamesById[gameId] ? this.gamesById[gameId].connectorsData : null;
+    }
+
+    public getAuths(ids?) {
+        if(ids === undefined || ids === null) {
+            ids = Object.keys(this.authMap);
+        } else {
+            ids = Array.isArray(ids) ? ids : [ids]
+        }
+        const requestedAuthMap = {};
+        let foundAuths = 0;
+        for(let i = 0; i < ids.length; i++) {
+            const auth = this.authMap.get(ids[i]);
+            if(auth) {
+                foundAuths++;
+                requestedAuthMap[ids[i]] = auth.auth;
+            }
+        }
+        if(foundAuths) {
+            return requestedAuthMap
+        } else {
+            return null;
+        }
     }
 
     private getClientCountOnConnector(serverIndex) {
