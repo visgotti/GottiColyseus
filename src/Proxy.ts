@@ -34,7 +34,7 @@ export class Proxy {
         this.app.use(`${GOTTI_HTTP_ROUTES.BASE_GATE}`, proxy(this.gateUrl));
 
         return new Promise((resolve, reject) => {
-            this.server = this.app.listen(80, () => {
+            this.server = this.app.listen(this.proxyPort, () => {
                 return resolve(true);
             });
         })
