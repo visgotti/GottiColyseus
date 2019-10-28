@@ -259,6 +259,17 @@ export abstract class Connector extends EventEmitter {
         return 1;
     }
 
+    public getClientDataByGottiId(gottiId) {
+        const client = this.clientsById[gottiId];
+        if(client) {
+            return {
+                auth: client.auth,
+                seatOptions: client.seatOptions,
+            }
+        }
+        return null;
+    }
+
     public async disconnect(closeHttp: boolean=true) : Promise<boolean> {
         this.stopMessageRelay();
         this.autoDispose = true;
