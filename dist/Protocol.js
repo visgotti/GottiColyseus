@@ -8,6 +8,18 @@ var StateProtocol;
     StateProtocol[StateProtocol["SET"] = 0] = "SET";
     StateProtocol[StateProtocol["PATCH"] = 1] = "PATCH";
 })(StateProtocol = exports.StateProtocol || (exports.StateProtocol = {}));
+exports.GOTTI_HTTP_ROUTES = {
+    BASE_AUTH: '/gotti_auth',
+    AUTHENTICATE: '/gotti_authenticate',
+    REGISTER: '/gotti_register',
+    BASE_GATE: 'gotti_gate',
+    GET_GAMES: '/gotti_games',
+    JOIN_GAME: '/gotti_join_game'
+};
+exports.GOTTI_ROUTE_BODY_PAYLOAD = '__GOTTI_ROUTE_BODY_PAYLOAD__';
+exports.GOTTI_GET_GAMES_OPTIONS = '__GOTTI_GET_GAMES_OPTIONS__';
+exports.GOTTI_AUTH_KEY = '__GOTTI_AUTH_KEY__';
+exports.GOTTI_GATE_AUTH_ID = '__GOTTI_AUTH_ID__';
 exports.GOTTI_GATE_CHANNEL_PREFIX = '__GOTTI_GATE_CHANNEL__';
 exports.GOTTI_MASTER_CHANNEL_ID = '__GOTTI_MASTER_CHANNEL__';
 exports.GOTTI_MASTER_SERVER_INDEX = 55555;

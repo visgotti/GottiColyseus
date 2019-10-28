@@ -11,6 +11,9 @@
   "author": "visgotti",
   "license": "ISC",
   "dependencies": {
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "express-http-proxy": "^1.6.0",
     "gotti-channels": "^0.2.54",
     "gotti-reqres": "^0.1.1",
     "helmet": "^3.21.2",
@@ -28,7 +31,6 @@
     "@types/node": "^10.14.8",
     "@types/sinon": "^4.3.3",
     "assert": "^1.4.1",
-    "express": "^4.17.1",
     "gotti.js": "0.0.3",
     "mocha": "^5.2.0",
     "sinon": "^7.2.2",

@@ -72,7 +72,6 @@ export declare abstract class Connector extends EventEmitter {
     onJoin?(client: Client): any | Promise<any>;
     onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     onDispose?(): void | Promise<any>;
-    onAuth?(options: any): boolean;
     /**
      * @param auth - authentication data sent from Gate server.
      * @param seatOptions - additional options that may have sent from gate server, you can add/remove properties
@@ -80,6 +79,10 @@ export declare abstract class Connector extends EventEmitter {
      * @returns {number}
      */
     requestJoin(auth: any, seatOptions: any): number | boolean;
+    getClientDataByGottiId(gottiId: any): {
+        auth: any;
+        seatOptions: any;
+    };
     disconnect(closeHttp?: boolean): Promise<boolean>;
     /**
      * When a client succesfully joins a connector they need to make an initial area request

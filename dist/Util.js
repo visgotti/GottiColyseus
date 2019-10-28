@@ -61,7 +61,9 @@ function parseQueryString(query) {
     return data;
 }
 exports.parseQueryString = parseQueryString;
-function generateId() { return nanoid(9); }
+function generateId(len = 9) {
+    return nanoid(len);
+}
 exports.generateId = generateId;
 function merge(a, ...objs) {
     for (let i = 0, len = objs.length; i < len; i++) {

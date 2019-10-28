@@ -149,6 +149,16 @@ class Connector extends events_1.EventEmitter {
     requestJoin(auth, seatOptions) {
         return 1;
     }
+    getClientDataByGottiId(gottiId) {
+        const client = this.clientsById[gottiId];
+        if (client) {
+            return {
+                auth: client.auth,
+                seatOptions: client.seatOptions,
+            };
+        }
+        return null;
+    }
     async disconnect(closeHttp = true) {
         this.stopMessageRelay();
         this.autoDispose = true;
