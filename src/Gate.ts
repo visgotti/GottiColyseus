@@ -17,7 +17,7 @@ export interface ConnectorData {
  * @param auth - user authentication data
  * @param clientOptions - additional options client may have passed in game request
  */
-export type MatchMakerFunction = (availableGames: any, auth: any, clientOptions?: any) => { gameId: string, seatOptions: any };
+export type MatchMakerFunction = (availableGames: any, auth: any, clientOptions?: any) => { gameId: string, joinOptions: any };
 
 export interface GameData {
     connectorsData: Array<ConnectorData>;
@@ -26,6 +26,8 @@ export interface GameData {
     region?: string,
     publicOptions?: any,
     options?: any,
+    gameData?: any,
+    areaData?: any,
 }
 
 export interface GateConfig {
@@ -145,7 +147,7 @@ export class Gate {
         return this.requester.requests[reqName].bind(this);
     }
 
-    private async reserveSeat(connectorServerIndex, auth, seatOptions): Promise<any> {
+    private async reserveSeat(connectorServerIndex, auth, clientJoinOptions): Promise<any> {
         const tempId = generateId();
 
         this.playerIndex++;
@@ -157,7 +159,7 @@ export class Gate {
         try {
             this.pendingClients[tempId] = auth;
 
-            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, seatOptions });
+            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, joinOptions: clientJoinOptions });
 
             if(result && result.gottiId) {
                 this.pendingClients.delete(tempId);
@@ -181,7 +183,7 @@ export class Gate {
     }
 
     // TODO: refactor this and adding games
-    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number }>, gameType, gameId, publicOptions?: any) {
+    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number }>, gameType, gameId, areaData: any, gameData: any) {
 
         if(gameId in this.gamesById) {
             throw `gameId: ${gameId} is being added for a second time. The first reference was ${this.gamesById[gameId]}`
@@ -198,7 +200,8 @@ export class Gate {
             id: gameId,
             type: gameType,
             connectorsData: gameConnectorsData,
-            publicOptions,
+            areaData,
+            gameData
         };
 
         if(!(gameType in this.availableGamesByType)) {
@@ -263,7 +266,7 @@ export class Gate {
 
         const { gameType } = validated;
 
-        const { host, port, gottiId, playerIndex } = await this.matchMake(gameType, clientAuth, clientOptions, req);
+        const { host, port, gottiId, playerIndex, joinOptions } = await this.matchMake(gameType, clientAuth, clientOptions, req);
 
         if(host && port) {
             return res.status(200).json({ host, port, gottiId, playerIndex, clientId: playerIndex });
@@ -289,18 +292,14 @@ export class Gate {
 
             const availableGames = this.availableGamesByType[gameType];
 
-            const { gameId, joinOptions } = definedMatchMaker(availableGames, auth, clientJoinOptions, req);
-
-            if(!(gameId in this.gamesById)) {
-                throw `match maker gave gameId: ${gameId} which is not a valid game id.`;
-            }
+            const gameId = definedMatchMaker(availableGames, auth, clientJoinOptions, req);
+            if(!gameId) throw 'Failed to find game.';
+            if(!(gameId in this.gamesById)) throw `match maker gave gameId: ${gameId} which is not a valid game id.`;
 
             const connectorData = this.gamesById[gameId].connectorsData[0]; // always sorted;
 
-            console.log('the connector data was', connectorData);
-
-            const { host, port, gottiId, playerIndex } = await this.addPlayerToConnector(connectorData.serverIndex, auth, joinOptions);
-            return { host, port, gottiId, playerIndex };
+            const { host, port, gottiId, playerIndex, joinOptions } = await this.addPlayerToConnector(connectorData.serverIndex, auth, clientJoinOptions);
+            return { host, port, gottiId, playerIndex, joinOptions };
         } catch (err) {
             throw err;
         }
@@ -377,14 +376,14 @@ export class Gate {
      *
      * @param serverIndex
      * @param auth
-     * @param seatOptions
+     * @param joinOptions
      * @returns {{host, port, gottiId, playerIndex }}
      */
-    private async addPlayerToConnector(serverIndex, auth?, seatOptions?) : Promise<any> {
+    private async addPlayerToConnector(serverIndex, auth?, clientJoinOptions?) : Promise<any> {
         const connectorData = this.connectorsByServerIndex[serverIndex];
         try {
             console.log('sending reserve seat....');
-            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, seatOptions);
+            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, clientJoinOptions);
             connectorData.connectedClients++;
             //sorts
             this.gamesById[connectorData.gameId].connectorsData.sort(sortByProperty('connectedClients'));
@@ -498,6 +497,7 @@ export class Gate {
                     this.authMap.delete(newAuthKey);
                 }, this.authTimeout)
             })
+            return newAuthKey
         });
     }
 

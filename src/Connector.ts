@@ -55,6 +55,7 @@ export type ConnectorOptions = IServerOptions & {
     messageRelayRate?: number,
     serverIndex: number,
     connectorURI: string,
+    gameData?: any,
     gateURI: string,
     masterServerURI?: string,
     areaRoomIds: Array<string>,
@@ -78,7 +79,8 @@ export abstract class Connector extends EventEmitter {
     private relayChannel?: FrontChannel;
     private masterServerChannel?: FrontChannel;
 
-    public areaOptions: {[areaId: string]: any};
+    public areaData: {[areaId: string]: any};
+    public gameData: any = {};
 
     public options: ConnectorOptions;
 
@@ -129,6 +131,10 @@ export abstract class Connector extends EventEmitter {
         this.options = options;
         this.options.port = this.port;
 
+        if(this.options.gameData) {
+            this.gameData = this.options.gameData
+        }
+
         if(options.server === 'http') {
             this.httpServer = http.createServer();
             this.options.server = this.httpServer;
@@ -136,6 +142,7 @@ export abstract class Connector extends EventEmitter {
         } else {
             throw 'please use http or net as server option'
         }
+        console.log('port was', this.port);
 
         this.responder = new Responder({
             response: true,
@@ -168,12 +175,14 @@ export abstract class Connector extends EventEmitter {
 
     protected onConnection = (client: Client, req: http.IncomingMessage & any) => {
         client.pingCount = 0;
+        console.log('got on conn request as');
 
         const upgradeReq = req || client.upgradeReq;
         const url = parseURL(upgradeReq.url);
         const query = parseQueryString(url.query);
+        console.log('query was', query);
         req.gottiId = query.gottiId;
-
+        console.log('req.gottiId was', req.gottiId);
 
         if(!(client) || !(req.gottiId) || !(this.reservedSeats[req.gottiId]) ) {
             send(client, [Protocol.JOIN_CONNECTOR_ERROR])
@@ -182,7 +191,7 @@ export abstract class Connector extends EventEmitter {
 
             client.gottiId = req.gottiId;
             client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
-            this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
+            this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].joinOptions);
         }
 
         // prevent server crashes if a single client had unexpected error
@@ -217,15 +226,16 @@ export abstract class Connector extends EventEmitter {
         return new Promise((resolve, reject) => {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
-                    this.areaOptions = connection.backChannelOptions;
+                    this.areaData = connection.backChannelOptions;
 
                     // connection backChannelOptions were made with area channels in mind.. so
                     // these frameworked channels keys should be deleted if theyre in.
-                    delete this.areaOptions[GOTTI_RELAY_CHANNEL_ID];
-                    delete this.areaOptions[GOTTI_MASTER_CHANNEL_ID];
+                    delete this.areaData[GOTTI_RELAY_CHANNEL_ID];
+                    delete this.areaData[GOTTI_MASTER_CHANNEL_ID];
 
                     this.registerChannelMessages();
                     this.server = new WebSocket.Server(this.options);
+                    console.log('registered websocket server');
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
                     this.startMessageRelay();
@@ -251,11 +261,11 @@ export abstract class Connector extends EventEmitter {
 
     /**
      * @param auth - authentication data sent from Gate server.
-     * @param seatOptions - additional options that may have sent from gate server, you can add/remove properties
+     * @param joinOptions - additional options that may have sent from gate server, you can add/remove properties
      * to it in request join and it will persist onto the client object.
      * @returns {number}
      */
-    public requestJoin(auth: any, seatOptions: any): number | boolean {
+    public requestJoin(auth: any, joinOptions: any): number | boolean {
         return 1;
     }
 
@@ -264,7 +274,7 @@ export abstract class Connector extends EventEmitter {
         if(client) {
             return {
                 auth: client.auth,
-                seatOptions: client.seatOptions,
+                joinOptions: client.joinOptions,
             }
         }
         return null;
@@ -300,11 +310,11 @@ export abstract class Connector extends EventEmitter {
      *  the player listens and writes to. from there use the ClientManager setClientWrite/addClientListen/ and removeClientListener
      *  to change a players areas.
      * @param client
-     * @param areaOptions - options set on area before the game to help connector figure out which area to return
+     * @param areaData - options set on area before the game to help connector figure out which area to return
      * @param clientOptions - options sent from the client when starting the game.
      * @returns { areaId: string, options: any } - areaId the client is going to write to and any additional options to send.
      */
-    public abstract getInitialWriteArea(client: Client, areaOptions, clientOptions?) : { areaId: string, options: any }
+    public abstract getInitialWriteArea(client: Client, areaData, clientOptions?) : { areaId: string, options: any }
 
     protected broadcast(data: any, options?: BroadcastOptions): boolean {
         // no data given, try to broadcast patched state
@@ -455,7 +465,7 @@ export abstract class Connector extends EventEmitter {
 
 
     private async _getInitialWriteArea(client, clientOptions?: any) : Promise<boolean> {
-        const write = this.getInitialWriteArea(client, this.areaOptions, clientOptions);
+        const write = this.getInitialWriteArea(client, this.areaData, clientOptions);
         if(write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);
@@ -519,7 +529,7 @@ export abstract class Connector extends EventEmitter {
     }
 
     private async addAreaListen(client, areaId, options?) : Promise<boolean> {
-        try{
+        try {
             const linkedResponse = await client.channelClient.linkChannel(areaId, options);
 
             /* adds newest state from listened area to the clients queued state updates as a 'SET' update
@@ -570,11 +580,11 @@ export abstract class Connector extends EventEmitter {
         send(client, [Protocol.REMOVE_CLIENT_AREA_LISTEN, areaId, options]);
     }
 
-    private _onJoin(client, auth: any, seatOptions: any) {
+    private _onJoin(client, auth: any, joinOptions: any) {
         // clear the timeout and remove the reserved seat since player joined
         clearTimeout(this.reservedSeats[client.gottiId].timeout);
         delete this.reservedSeats[client.gottiId];
-
+        console.log('got onjoin');
         // add a channelClient to client
         client.channelClient = new ChannelClient(client.gottiId, this.masterChannel);
         // register channel/area message handlers
@@ -582,15 +592,12 @@ export abstract class Connector extends EventEmitter {
         this.clients.push( client );
         this.clientsById[client.gottiId] = client;
         client.auth = auth;
-        client.seatOptions = seatOptions;
-        let joinOptions = null;
+        client.joinOptions = joinOptions;
         if(this.onJoin) {
-            joinOptions = this.onJoin(client)
+            client.joinedOptions = this.onJoin(client)
         }
         client.auth = auth;
-        client.seatOptions = seatOptions;
-
-        send(client, [ Protocol.JOIN_CONNECTOR, this.areaOptions, joinOptions ]);
+        send(client, [ Protocol.JOIN_CONNECTOR, this.areaData, this.gameData, client.joinedOptions ]);
 
         if(this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
             this.relayChannel.send([Protocol.JOIN_CONNECTOR, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid])
@@ -625,14 +632,14 @@ export abstract class Connector extends EventEmitter {
      * reserves seat till player joins
      * @param clientId - id of player to reserve seat for
      * @param auth - data player authenticated with on gate.
-     * @param seatOptions - additional data sent from the gate
+     * @param joinOptions - additional data sent from the gate
      * @private
      */
-    private _reserveSeat(clientId, playerIndex, auth, seatOptions) {
+    private _reserveSeat(clientId, playerIndex, auth, joinOptions) {
         this.reservedSeats[clientId] = {
             auth,
             playerIndex,
-            seatOptions,
+            joinOptions,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
             }, 10000) // reserve seat for 10 seconds
@@ -648,12 +655,11 @@ export abstract class Connector extends EventEmitter {
     private _requestJoin(data) {
         const playerIndex= data.playerIndex;
         const auth = data && data.auth ? data.auth : {};
-        const seatOptions = data && data.seatOptions ? data.seatOptions : {};
+        const joinOptions = data && data.joinOptions ? data.joinOptions : {};
 
-        if(this.requestJoin(auth, seatOptions)) {
+        if(this.requestJoin(auth, joinOptions)) {
             const gottiId = generateId();
-
-            this._reserveSeat(gottiId, playerIndex, auth, seatOptions);
+            this._reserveSeat(gottiId, playerIndex, auth, joinOptions);
             // todo send host n port
             return { gottiId } ;
         } else {

@@ -82,7 +82,7 @@ class Gate {
         this.requester.createRequest(reqName, `${connectorServerIndex}_responder`);
         return this.requester.requests[reqName].bind(this);
     }
-    async reserveSeat(connectorServerIndex, auth, seatOptions) {
+    async reserveSeat(connectorServerIndex, auth, joinOptions) {
         const tempId = Util_1.generateId();
         this.playerIndex++;
         if (this.playerIndex > 65535) {
@@ -91,7 +91,7 @@ class Gate {
         const playerIndex = this.playerIndex;
         try {
             this.pendingClients[tempId] = auth;
-            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, seatOptions });
+            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, joinOptions });
             if (result && result.gottiId) {
                 this.pendingClients.delete(tempId);
                 this.connectedClients.set(result.gottiId, connectorServerIndex);
@@ -202,13 +202,13 @@ class Gate {
                 throw `No matchmaking for ${gameType}`;
             }
             const availableGames = this.availableGamesByType[gameType];
-            const { gameId, joinOptions } = definedMatchMaker(availableGames, auth, clientJoinOptions, req);
-            if (!(gameId in this.gamesById)) {
+            const gameId = definedMatchMaker(availableGames, auth, clientJoinOptions, req);
+            if (!gameId)
+                throw 'Failed to find game.';
+            if (!(gameId in this.gamesById))
                 throw `match maker gave gameId: ${gameId} which is not a valid game id.`;
-            }
             const connectorData = this.gamesById[gameId].connectorsData[0]; // always sorted;
-            console.log('the connector data was', connectorData);
-            const { host, port, gottiId, playerIndex } = await this.addPlayerToConnector(connectorData.serverIndex, auth, joinOptions);
+            const { host, port, gottiId, playerIndex } = await this.addPlayerToConnector(connectorData.serverIndex, auth, clientJoinOptions);
             return { host, port, gottiId, playerIndex };
         }
         catch (err) {
@@ -281,14 +281,14 @@ class Gate {
      *
      * @param serverIndex
      * @param auth
-     * @param seatOptions
+     * @param joinOptions
      * @returns {{host, port, gottiId, playerIndex }}
      */
-    async addPlayerToConnector(serverIndex, auth, seatOptions) {
+    async addPlayerToConnector(serverIndex, auth, joinOptions) {
         const connectorData = this.connectorsByServerIndex[serverIndex];
         try {
             console.log('sending reserve seat....');
-            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, seatOptions);
+            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, joinOptions);
             connectorData.connectedClients++;
             //sorts
             this.gamesById[connectorData.gameId].connectorsData.sort(Util_1.sortByProperty('connectedClients'));
@@ -392,6 +392,7 @@ class Gate {
                     this.authMap.delete(newAuthKey);
                 }, this.authTimeout)
             });
+            return newAuthKey;
         });
     }
     getConnectorsByGameId(gameId) {

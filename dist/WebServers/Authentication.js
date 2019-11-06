@@ -106,7 +106,7 @@ class Authentication extends Base_1.BaseWebServer {
                     oldAuthId
                 });
                 if (authId) {
-                    return res.send(200).json({
+                    return res.json({
                         [Protocol_1.GOTTI_GATE_AUTH_ID]: authId,
                         [Protocol_1.GOTTI_AUTH_KEY]: auth,
                     });

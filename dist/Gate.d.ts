@@ -14,7 +14,7 @@ export interface ConnectorData {
  */
 export declare type MatchMakerFunction = (availableGames: any, auth: any, clientOptions?: any) => {
     gameId: string;
-    seatOptions: any;
+    joinOptions: any;
 };
 export interface GameData {
     connectorsData: Array<ConnectorData>;
@@ -93,7 +93,7 @@ export declare class Gate {
      *
      * @param serverIndex
      * @param auth
-     * @param seatOptions
+     * @param joinOptions
      * @returns {{host, port, gottiId, playerIndex }}
      */
     private addPlayerToConnector;

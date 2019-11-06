@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const path = require('path');
 const helmet = require('helmet');
-const proxy = require('express-http-proxy');
+const proxy = require('http-proxy-middleware');
 
 export class Proxy {
     private app: any;
@@ -29,9 +29,14 @@ export class Proxy {
     }
 
     public async init() {
-        this.app.use('/', proxy(this.getContentHostRoundRobin.bind(this)));
-        this.app.use(`${GOTTI_HTTP_ROUTES.BASE_AUTH}`, proxy(this.authUrl));
-        this.app.use(`${GOTTI_HTTP_ROUTES.BASE_GATE}`, proxy(this.gateUrl));
+        this.app.use(helmet());
+        this.app.use(`${GOTTI_HTTP_ROUTES.BASE_AUTH}`, proxy({ target: this.authUrl }));
+        this.app.use(`${GOTTI_HTTP_ROUTES.BASE_GATE}`, proxy({ target: this.gateUrl }));
+
+        this.app.use('/', proxy({
+            router: this.getContentHostRoundRobin.bind(this),
+            target: this.webUrls[this.currentWebUrlIdx],
+        }));
 
         return new Promise((resolve, reject) => {
             this.server = this.app.listen(this.proxyPort, () => {

@@ -74,14 +74,14 @@ export declare abstract class Connector extends EventEmitter {
     onDispose?(): void | Promise<any>;
     /**
      * @param auth - authentication data sent from Gate server.
-     * @param seatOptions - additional options that may have sent from gate server, you can add/remove properties
+     * @param joinOptions - additional options that may have sent from gate server, you can add/remove properties
      * to it in request join and it will persist onto the client object.
      * @returns {number}
      */
-    requestJoin(auth: any, seatOptions: any): number | boolean;
+    requestJoin(auth: any, joinOptions: any): number | boolean;
     getClientDataByGottiId(gottiId: any): {
         auth: any;
-        seatOptions: any;
+        joinOptions: any;
     };
     disconnect(closeHttp?: boolean): Promise<boolean>;
     /**
@@ -122,7 +122,7 @@ export declare abstract class Connector extends EventEmitter {
      * reserves seat till player joins
      * @param clientId - id of player to reserve seat for
      * @param auth - data player authenticated with on gate.
-     * @param seatOptions - additional data sent from the gate
+     * @param joinOptions - additional data sent from the gate
      * @private
      */
     private _reserveSeat;

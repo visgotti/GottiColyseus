@@ -98,7 +98,7 @@ export const GOTTI_HTTP_ROUTES = {
     BASE_AUTH: '/gotti_auth',
     AUTHENTICATE: '/gotti_authenticate',
     REGISTER: '/gotti_register',
-    BASE_GATE: 'gotti_gate',
+    BASE_GATE: '/gotti_gate',
     GET_GAMES: '/gotti_games',
     JOIN_GAME: '/gotti_join_game'
 }

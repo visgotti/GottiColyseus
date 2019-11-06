@@ -39,10 +39,13 @@ class Connector extends events_1.EventEmitter {
         this.reservedSeats = {};
         this.onConnection = (client, req) => {
             client.pingCount = 0;
+            console.log('got on conn request as');
             const upgradeReq = req || client.upgradeReq;
             const url = parseURL(upgradeReq.url);
             const query = Util_1.parseQueryString(url.query);
+            console.log('query was', query);
             req.gottiId = query.gottiId;
+            console.log('req.gottiId was', req.gottiId);
             if (!(client) || !(req.gottiId) || !(this.reservedSeats[req.gottiId])) {
                 Protocol_1.send(client, [11 /* JOIN_CONNECTOR_ERROR */]);
             }
@@ -50,7 +53,7 @@ class Connector extends events_1.EventEmitter {
                 client.p2p_capable = query.isWebRTCSupported;
                 client.gottiId = req.gottiId;
                 client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
-                this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
+                this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].joinOptions);
             }
             // prevent server crashes if a single client had unexpected error
             client.on('error', (err) => console.error(err.message + '\n' + err.stack));
@@ -76,6 +79,7 @@ class Connector extends events_1.EventEmitter {
         else {
             throw 'please use http or net as server option';
         }
+        console.log('port was', this.port);
         this.responder = new dist_1.Messenger({
             response: true,
             id: `${this.serverIndex}_responder`,
@@ -132,6 +136,7 @@ class Connector extends events_1.EventEmitter {
                     delete this.areaOptions[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
                     this.registerChannelMessages();
                     this.server = new WebSocket.Server(this.options);
+                    console.log('registered websocket server');
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
                     this.startMessageRelay();
@@ -142,11 +147,11 @@ class Connector extends events_1.EventEmitter {
     }
     /**
      * @param auth - authentication data sent from Gate server.
-     * @param seatOptions - additional options that may have sent from gate server, you can add/remove properties
+     * @param joinOptions - additional options that may have sent from gate server, you can add/remove properties
      * to it in request join and it will persist onto the client object.
      * @returns {number}
      */
-    requestJoin(auth, seatOptions) {
+    requestJoin(auth, joinOptions) {
         return 1;
     }
     getClientDataByGottiId(gottiId) {
@@ -154,7 +159,7 @@ class Connector extends events_1.EventEmitter {
         if (client) {
             return {
                 auth: client.auth,
-                seatOptions: client.seatOptions,
+                joinOptions: client.joinOptions,
             };
         }
         return null;
@@ -439,10 +444,11 @@ class Connector extends events_1.EventEmitter {
         client.channelClient.unlinkChannel(areaId);
         Protocol_1.send(client, [23 /* REMOVE_CLIENT_AREA_LISTEN */, areaId, options]);
     }
-    _onJoin(client, auth, seatOptions) {
+    _onJoin(client, auth, joinOptions) {
         // clear the timeout and remove the reserved seat since player joined
         clearTimeout(this.reservedSeats[client.gottiId].timeout);
         delete this.reservedSeats[client.gottiId];
+        console.log('got onjoin');
         // add a channelClient to client
         client.channelClient = new dist_2.Client(client.gottiId, this.masterChannel);
         // register channel/area message handlers
@@ -450,14 +456,13 @@ class Connector extends events_1.EventEmitter {
         this.clients.push(client);
         this.clientsById[client.gottiId] = client;
         client.auth = auth;
-        client.seatOptions = seatOptions;
-        let joinOptions = null;
+        client.joinOptions = joinOptions;
         if (this.onJoin) {
-            joinOptions = this.onJoin(client);
+            client.joinedOptions = this.onJoin(client);
         }
         client.auth = auth;
-        client.seatOptions = seatOptions;
-        Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, this.areaOptions, joinOptions]);
+        console.log('sendingbackjoined');
+        Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, this.areaOptions, client.joinedOptions]);
         if (this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
             this.relayChannel.send([10 /* JOIN_CONNECTOR */, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid]);
         }
@@ -486,14 +491,14 @@ class Connector extends events_1.EventEmitter {
      * reserves seat till player joins
      * @param clientId - id of player to reserve seat for
      * @param auth - data player authenticated with on gate.
-     * @param seatOptions - additional data sent from the gate
+     * @param joinOptions - additional data sent from the gate
      * @private
      */
-    _reserveSeat(clientId, playerIndex, auth, seatOptions) {
+    _reserveSeat(clientId, playerIndex, auth, joinOptions) {
         this.reservedSeats[clientId] = {
             auth,
             playerIndex,
-            seatOptions,
+            joinOptions,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
             }, 10000) // reserve seat for 10 seconds
@@ -508,12 +513,12 @@ class Connector extends events_1.EventEmitter {
     _requestJoin(data) {
         const playerIndex = data.playerIndex;
         const auth = data && data.auth ? data.auth : {};
-        const seatOptions = data && data.seatOptions ? data.seatOptions : {};
-        if (this.requestJoin(auth, seatOptions)) {
+        const joinOptions = data && data.joinOptions ? data.joinOptions : {};
+        if (this.requestJoin(auth, joinOptions)) {
             const gottiId = Util_1.generateId();
-            this._reserveSeat(gottiId, playerIndex, auth, seatOptions);
+            this._reserveSeat(gottiId, playerIndex, auth, joinOptions);
             // todo send host n port
-            return { gottiId };
+            return { gottiId, areaOptions: this.areaOptions };
         }
         else {
             return false;

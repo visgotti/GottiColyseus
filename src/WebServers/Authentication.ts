@@ -132,7 +132,7 @@ export class Authentication extends BaseWebServer {
                     oldAuthId
                 });
                 if(authId) {
-                    return res.send(200).json({
+                    return res.json({
                         [GOTTI_GATE_AUTH_ID]: authId,
                         [GOTTI_AUTH_KEY]: auth,
                     })
