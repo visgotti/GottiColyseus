@@ -266,10 +266,10 @@ export class Gate {
 
         const { gameType } = validated;
 
-        const { host, port, gottiId, playerIndex, joinOptions } = await this.matchMake(gameType, clientAuth, clientOptions, req);
+        const { host, port, gottiId, playerIndex, gameData, areaData } = await this.matchMake(gameType, clientAuth, clientOptions, req);
 
         if(host && port) {
-            return res.status(200).json({ host, port, gottiId, playerIndex, clientId: playerIndex });
+            return res.status(200).json({ host, port, gottiId, playerIndex, clientId: playerIndex, gameData, areaData });
         } else {
             return res.status(500).json('Invalid request');
         }
@@ -299,7 +299,8 @@ export class Gate {
             const connectorData = this.gamesById[gameId].connectorsData[0]; // always sorted;
 
             const { host, port, gottiId, playerIndex, joinOptions } = await this.addPlayerToConnector(connectorData.serverIndex, auth, clientJoinOptions);
-            return { host, port, gottiId, playerIndex, joinOptions };
+            const { gameData, areaData } = this.gamesById[gameId];
+            return { host, port, gottiId, playerIndex, joinOptions, gameData, areaData  };
         } catch (err) {
             throw err;
         }

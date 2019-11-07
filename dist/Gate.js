@@ -82,7 +82,7 @@ class Gate {
         this.requester.createRequest(reqName, `${connectorServerIndex}_responder`);
         return this.requester.requests[reqName].bind(this);
     }
-    async reserveSeat(connectorServerIndex, auth, joinOptions) {
+    async reserveSeat(connectorServerIndex, auth, clientJoinOptions) {
         const tempId = Util_1.generateId();
         this.playerIndex++;
         if (this.playerIndex > 65535) {
@@ -91,7 +91,7 @@ class Gate {
         const playerIndex = this.playerIndex;
         try {
             this.pendingClients[tempId] = auth;
-            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, joinOptions });
+            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, joinOptions: clientJoinOptions });
             if (result && result.gottiId) {
                 this.pendingClients.delete(tempId);
                 this.connectedClients.set(result.gottiId, connectorServerIndex);
@@ -115,7 +115,7 @@ class Gate {
         }
     }
     // TODO: refactor this and adding games
-    addGame(connectorsData, gameType, gameId, publicOptions) {
+    addGame(connectorsData, gameType, gameId, areaData, gameData) {
         if (gameId in this.gamesById) {
             throw `gameId: ${gameId} is being added for a second time. The first reference was ${this.gamesById[gameId]}`;
         }
@@ -128,7 +128,8 @@ class Gate {
             id: gameId,
             type: gameType,
             connectorsData: gameConnectorsData,
-            publicOptions,
+            areaData,
+            gameData
         };
         if (!(gameType in this.availableGamesByType)) {
             this.availableGamesByType[gameType] = {};
@@ -180,9 +181,9 @@ class Gate {
             return res.status(validated.code).json(validated.error);
         }
         const { gameType } = validated;
-        const { host, port, gottiId, playerIndex } = await this.matchMake(gameType, clientAuth, clientOptions, req);
+        const { host, port, gottiId, playerIndex, gameData, areaData } = await this.matchMake(gameType, clientAuth, clientOptions, req);
         if (host && port) {
-            return res.status(200).json({ host, port, gottiId, playerIndex, clientId: playerIndex });
+            return res.status(200).json({ host, port, gottiId, playerIndex, clientId: playerIndex, gameData, areaData });
         }
         else {
             return res.status(500).json('Invalid request');
@@ -208,8 +209,9 @@ class Gate {
             if (!(gameId in this.gamesById))
                 throw `match maker gave gameId: ${gameId} which is not a valid game id.`;
             const connectorData = this.gamesById[gameId].connectorsData[0]; // always sorted;
-            const { host, port, gottiId, playerIndex } = await this.addPlayerToConnector(connectorData.serverIndex, auth, clientJoinOptions);
-            return { host, port, gottiId, playerIndex };
+            const { host, port, gottiId, playerIndex, joinOptions } = await this.addPlayerToConnector(connectorData.serverIndex, auth, clientJoinOptions);
+            const { gameData, areaData } = this.gamesById[gameId];
+            return { host, port, gottiId, playerIndex, joinOptions, gameData, areaData };
         }
         catch (err) {
             throw err;
@@ -284,11 +286,11 @@ class Gate {
      * @param joinOptions
      * @returns {{host, port, gottiId, playerIndex }}
      */
-    async addPlayerToConnector(serverIndex, auth, joinOptions) {
+    async addPlayerToConnector(serverIndex, auth, clientJoinOptions) {
         const connectorData = this.connectorsByServerIndex[serverIndex];
         try {
             console.log('sending reserve seat....');
-            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, joinOptions);
+            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, clientJoinOptions);
             connectorData.connectedClients++;
             //sorts
             this.gamesById[connectorData.gameId].connectorsData.sort(Util_1.sortByProperty('connectedClients'));

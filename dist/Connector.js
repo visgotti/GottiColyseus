@@ -29,6 +29,7 @@ const DEFAULT_RELAY_RATE = 1000 / 30; // 30fpS
 class Connector extends events_1.EventEmitter {
     constructor(options) {
         super();
+        this.gameData = {};
         this.maxClients = Infinity;
         this.patchRate = DEFAULT_PATCH_RATE;
         this.autoDispose = true;
@@ -70,6 +71,9 @@ class Connector extends events_1.EventEmitter {
         this.port = options.port | 8080;
         this.options = options;
         this.options.port = this.port;
+        if (this.options.gameData) {
+            this.gameData = this.options.gameData;
+        }
         if (options.server === 'http') {
             this.httpServer = http.createServer();
             this.options.server = this.httpServer;
@@ -129,11 +133,11 @@ class Connector extends events_1.EventEmitter {
         return new Promise((resolve, reject) => {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
-                    this.areaOptions = connection.backChannelOptions;
+                    this.areaData = connection.backChannelOptions;
                     // connection backChannelOptions were made with area channels in mind.. so
                     // these frameworked channels keys should be deleted if theyre in.
-                    delete this.areaOptions[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
-                    delete this.areaOptions[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+                    delete this.areaData[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
+                    delete this.areaData[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
                     this.registerChannelMessages();
                     this.server = new WebSocket.Server(this.options);
                     console.log('registered websocket server');
@@ -332,7 +336,7 @@ class Connector extends events_1.EventEmitter {
         });
     }
     async _getInitialWriteArea(client, clientOptions) {
-        const write = this.getInitialWriteArea(client, this.areaOptions, clientOptions);
+        const write = this.getInitialWriteArea(client, this.areaData, clientOptions);
         if (write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);
@@ -461,8 +465,7 @@ class Connector extends events_1.EventEmitter {
             client.joinedOptions = this.onJoin(client);
         }
         client.auth = auth;
-        console.log('sendingbackjoined');
-        Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, this.areaOptions, client.joinedOptions]);
+        Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, client.joinedOptions]);
         if (this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
             this.relayChannel.send([10 /* JOIN_CONNECTOR */, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid]);
         }
@@ -518,7 +521,7 @@ class Connector extends events_1.EventEmitter {
             const gottiId = Util_1.generateId();
             this._reserveSeat(gottiId, playerIndex, auth, joinOptions);
             // todo send host n port
-            return { gottiId, areaOptions: this.areaOptions };
+            return { gottiId };
         }
         else {
             return false;

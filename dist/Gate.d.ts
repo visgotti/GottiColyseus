@@ -23,6 +23,8 @@ export interface GameData {
     region?: string;
     publicOptions?: any;
     options?: any;
+    gameData?: any;
+    areaData?: any;
 }
 export interface GateConfig {
     gateURI: string;
@@ -63,7 +65,7 @@ export declare class Gate {
         serverIndex: number;
         host: string;
         port: number;
-    }>, gameType: any, gameId: any, publicOptions?: any): void;
+    }>, gameType: any, gameId: any, areaData: any, gameData: any): void;
     private addConnector;
     /**
      * Handles the request from a player for a certain game type. needs work

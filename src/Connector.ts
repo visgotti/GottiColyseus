@@ -597,7 +597,7 @@ export abstract class Connector extends EventEmitter {
             client.joinedOptions = this.onJoin(client)
         }
         client.auth = auth;
-        send(client, [ Protocol.JOIN_CONNECTOR, this.areaData, this.gameData, client.joinedOptions ]);
+        send(client, [ Protocol.JOIN_CONNECTOR, client.joinedOptions ]);
 
         if(this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
             this.relayChannel.send([Protocol.JOIN_CONNECTOR, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid])

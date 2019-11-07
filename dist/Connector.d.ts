@@ -11,6 +11,7 @@ export declare type ConnectorOptions = IServerOptions & {
     messageRelayRate?: number;
     serverIndex: number;
     connectorURI: string;
+    gameData?: any;
     gateURI: string;
     masterServerURI?: string;
     areaRoomIds: Array<string>;
@@ -29,9 +30,10 @@ export declare abstract class Connector extends EventEmitter {
     protected httpServer: any;
     private relayChannel?;
     private masterServerChannel?;
-    areaOptions: {
+    areaData: {
         [areaId: string]: any;
     };
+    gameData: any;
     options: ConnectorOptions;
     serverIndex: number;
     connectorURI: string;
@@ -90,11 +92,11 @@ export declare abstract class Connector extends EventEmitter {
      *  the player listens and writes to. from there use the ClientManager setClientWrite/addClientListen/ and removeClientListener
      *  to change a players areas.
      * @param client
-     * @param areaOptions - options set on area before the game to help connector figure out which area to return
+     * @param areaData - options set on area before the game to help connector figure out which area to return
      * @param clientOptions - options sent from the client when starting the game.
      * @returns { areaId: string, options: any } - areaId the client is going to write to and any additional options to send.
      */
-    abstract getInitialWriteArea(client: Client, areaOptions: any, clientOptions?: any): {
+    abstract getInitialWriteArea(client: Client, areaData: any, clientOptions?: any): {
         areaId: string;
         options: any;
     };
