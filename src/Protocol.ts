@@ -40,6 +40,7 @@ export const enum Protocol {
     AREA_TO_AREA_SYSTEM_MESSAGE = 34,
     AREA_TO_MASTER_MESSAGE = 35,
     MASTER_TO_AREA_BROADCAST = 36,
+    GLOBAL_MASTER_MESSAGE = 37,
         // Generic messages (50~60)
     BAD_REQUEST = 50,
 

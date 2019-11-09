@@ -1,3 +1,5 @@
+import {generateId} from "../Util";
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const helmet = require('helmet');
@@ -15,31 +17,41 @@ import {
     GOTTI_ROUTE_BODY_PAYLOAD
 } from "../Protocol";
 
-export class Authentication extends BaseWebServer {
+type AuthMasterHandler = (message: any) => void;
+
+import MasterServerListener from "../Mixins/MasterServerListener";
+
+class AuthenticationBase extends BaseWebServer {
     public app: any;
     private server: any;
 
     private onAuthHandler: Function;
     private onRegisterHandler: Function;
     private onForgotPasswordHandler: Function;
+    private masterServerURI: string;
+
+    private onMasterMessageHandler: AuthMasterHandler;
 
     private onInitHandler: Function;
     readonly clientPath: string;
     private requester: Messenger;
     private reserveGateRequest: Function;
     readonly port: number;
+    private authTimeout: number = 1000 * 60 * 60 * 12; // 12 hours
+    private authMap: Map<string, any> = new Map();
+    private dataHandler: any;
 
-    constructor(gateURI, port?) {
+    readonly data: any = {};
+
+    constructor(gateURI, port, app?, sessionTimeout?) {
         super();
+        this.authTimeout = sessionTimeout ? sessionTimeout : this.authTimeout;
         this.port = port;
         this.requester = new Messenger({
             id: 'authentication_requester',
             brokerURI: gateURI,
             request: { timeout: 1000 }
         });
-    }
-
-    public async init(app?) {
         if(app) {
             this.app = app;
         } else {
@@ -50,13 +62,26 @@ export class Authentication extends BaseWebServer {
             this.app.use(bodyParser.json({type: 'application/json'}));
             this.server = this.app.listen(this.port);
         }
+        this.authMap = new Map();
+    }
 
+    public async init(dataInitHandler?, masterURI?) {
+        if(dataInitHandler) {
+            const _data = await dataInitHandler();
+            Object.keys(_data).forEach(key => {
+                this.data[key] = _data[key];
+            });
+        }
         const reqName = GOTTI_GATE_CHANNEL_PREFIX + '-' + GateProtocol.RESERVE_AUTHENTICATION;
         this.requester.createRequest(reqName, 'gate_responder');
         this.reserveGateRequest = this.requester.requests[reqName].bind(this);
         this.app.post(`${GOTTI_HTTP_ROUTES.BASE_AUTH}${GOTTI_HTTP_ROUTES.AUTHENTICATE}`, this.onAuth.bind(this));
         this.app.post(`${GOTTI_HTTP_ROUTES.BASE_AUTH}${GOTTI_HTTP_ROUTES.REGISTER}`, this.onRegister.bind(this));
         return true;
+    }
+
+    public addOnMasterMessageHandler(handler) {
+        this.onMasterMessageHandler = handler;
     }
 
     public addOnAuth(handler) {
@@ -72,6 +97,9 @@ export class Authentication extends BaseWebServer {
             auth: authObject,
             oldAuthId
         });
+
+        this.removeOldAuth(oldAuthId);
+
         req['GOTTI_AUTH'] = {
             [GOTTI_GATE_AUTH_ID]: newAuthId,
             [GOTTI_AUTH_KEY]: authObject
@@ -84,14 +112,30 @@ export class Authentication extends BaseWebServer {
             throw new Error('Cannot add route since theres no express server initialized on web server')
         }
         this.app.post(route, async (req, res) => {
-            return Promise.resolve(handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], this.setClientAuth.bind(this, req))).then((responseObject) => {
-                return res.json({ responseObject, 'GOTTI_AUTH': req['GOTTI_AUTH'] });
+            const authId = req.body[GOTTI_GATE_AUTH_ID];
+            const auth = this.authMap.get(authId);
+            if(!auth) {
+                return res.status(503).json({ error: 'not authenticated' });
+            }
+            return Promise.resolve(handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], auth)).then((responseObject) => {
+                return res.json({ responseObject });
             }).catch(err => {
                 return res.json({error: err})
             })
         })
     }
 
+    private removeOldAuth(oldAuthId) {
+        if(oldAuthId) {
+            const old = this.authMap.get(oldAuthId);
+            if(old) {
+                clearTimeout(old.timeout);
+                this.authMap.delete(oldAuthId);
+                return true;
+            }
+        }
+        return false;
+    }
     public async onRegister(req, res) {
         if(this.onRegisterHandler) {
             try {
@@ -132,6 +176,19 @@ export class Authentication extends BaseWebServer {
                     oldAuthId
                 });
                 if(authId) {
+                    if(oldAuthId) {
+                        const old = this.authMap.get(oldAuthId);
+                        if(old) {
+                            clearTimeout(old.timeout);
+                            this.authMap.delete(oldAuthId);
+                        }
+                    }
+                    this.authMap.set(authId, {
+                        auth,
+                        timeout: setTimeout(() => {
+                            this.authMap.delete(authId);
+                        }, this.authTimeout)
+                    });
                     return res.json({
                         [GOTTI_GATE_AUTH_ID]: authId,
                         [GOTTI_AUTH_KEY]: auth,
@@ -147,3 +204,5 @@ export class Authentication extends BaseWebServer {
         }
     }
 }
+const Authentication = MasterServerListener(AuthenticationBase);
+export default Authentication;

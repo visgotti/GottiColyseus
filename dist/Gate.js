@@ -109,13 +109,12 @@ class Gate {
             }
         }
         catch (err) {
-            console.log('error was', err);
             this.pendingClients.delete(tempId);
             throw err;
         }
     }
     // TODO: refactor this and adding games
-    addGame(connectorsData, gameType, gameId, areaData, gameData) {
+    addGame(connectorsData, gameType, gameId, gameData, areaData) {
         if (gameId in this.gamesById) {
             throw `gameId: ${gameId} is being added for a second time. The first reference was ${this.gamesById[gameId]}`;
         }
@@ -289,7 +288,6 @@ class Gate {
     async addPlayerToConnector(serverIndex, auth, clientJoinOptions) {
         const connectorData = this.connectorsByServerIndex[serverIndex];
         try {
-            console.log('sending reserve seat....');
             const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, clientJoinOptions);
             connectorData.connectedClients++;
             //sorts

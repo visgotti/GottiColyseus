@@ -40,13 +40,10 @@ class Connector extends events_1.EventEmitter {
         this.reservedSeats = {};
         this.onConnection = (client, req) => {
             client.pingCount = 0;
-            console.log('got on conn request as');
             const upgradeReq = req || client.upgradeReq;
             const url = parseURL(upgradeReq.url);
             const query = Util_1.parseQueryString(url.query);
-            console.log('query was', query);
             req.gottiId = query.gottiId;
-            console.log('req.gottiId was', req.gottiId);
             if (!(client) || !(req.gottiId) || !(this.reservedSeats[req.gottiId])) {
                 Protocol_1.send(client, [11 /* JOIN_CONNECTOR_ERROR */]);
             }
@@ -83,7 +80,6 @@ class Connector extends events_1.EventEmitter {
         else {
             throw 'please use http or net as server option';
         }
-        console.log('port was', this.port);
         this.responder = new dist_1.Messenger({
             response: true,
             id: `${this.serverIndex}_responder`,
@@ -140,7 +136,6 @@ class Connector extends events_1.EventEmitter {
                     delete this.areaData[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
                     this.registerChannelMessages();
                     this.server = new WebSocket.Server(this.options);
-                    console.log('registered websocket server');
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
                     this.startMessageRelay();
@@ -285,7 +280,6 @@ class Connector extends events_1.EventEmitter {
             else if (protocol === 113 /* SIGNAL_FAILED */) {
                 // [protocol, fromPlayerIndex, toPlayerGottiId, options])
                 const toClient = this.clientsById[message[2]];
-                console.log('GOT FAILED PEER CONNECTION REQUEST BACK FROM RELAY');
                 if (toClient) {
                     // [protocol, fromPlayerIndex, options?]
                     Protocol_1.send(toClient, [protocol, message[1], message[2]]);
@@ -294,7 +288,6 @@ class Connector extends events_1.EventEmitter {
             else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
                 //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, systemName, requestOptions, toPlayerrGottiId], toPlayerData.connectorId)
                 const toClient = this.clientsById[message[5]];
-                console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
                 if (toClient) {
                     // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
                     Protocol_1.send(toClient, [protocol, message[1], message[2], message[3], message[4]]);
@@ -336,7 +329,14 @@ class Connector extends events_1.EventEmitter {
         });
     }
     async _getInitialWriteArea(client, clientOptions) {
+        const oldAreaId = client.channelClient.processorChannel;
+        if (oldAreaId) {
+            Protocol_1.send(client, 24 /* WRITE_AREA_ERROR */);
+            return false;
+        }
+        console.log('running get initialWriteArea');
         const write = this.getInitialWriteArea(client, this.areaData, clientOptions);
+        console.log('write area id was', write.areaId);
         if (write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);
@@ -427,7 +427,6 @@ class Connector extends events_1.EventEmitter {
      * @returns {boolean}
      */
     async changeAreaWrite(client, newAreaId, writeOptions) {
-        const oldAreaId = client.channelClient.processorChannel;
         let isLinked = client.channelClient.isLinkedToChannel(newAreaId);
         if (!(isLinked)) {
             isLinked = await this.addAreaListen(client, newAreaId, writeOptions);
@@ -452,7 +451,6 @@ class Connector extends events_1.EventEmitter {
         // clear the timeout and remove the reserved seat since player joined
         clearTimeout(this.reservedSeats[client.gottiId].timeout);
         delete this.reservedSeats[client.gottiId];
-        console.log('got onjoin');
         // add a channelClient to client
         client.channelClient = new dist_2.Client(client.gottiId, this.masterChannel);
         // register channel/area message handlers

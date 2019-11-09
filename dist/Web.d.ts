@@ -1,10 +1,9 @@
-import { Authentication } from './WebServers/Authentication';
 import { GateWebServer } from './WebServers/Gate';
 import { BaseWebServer } from "./WebServers/Base";
 export declare class WebServer extends BaseWebServer {
     app: any;
     gate: GateWebServer;
-    auth: Authentication;
+    auth: any;
     private isInitialized;
     private server;
     readonly publicPath: string;
@@ -13,6 +12,6 @@ export declare class WebServer extends BaseWebServer {
     constructor(port: any, clientFilePath: any, publicContentPath: any);
     addHandler(route: string, handler: Function): void;
     init(): Promise<{}>;
-    hostAuth(gateURI: any): Promise<boolean>;
+    hostAuth(gateURI: any, authSessionTimeout?: any): void;
     hostGate(gateURI: any): Promise<boolean>;
 }

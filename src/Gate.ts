@@ -176,14 +176,13 @@ export class Gate {
                 throw new Error('Invalid response from connector room. Failed to connect.');
             }
         } catch(err) {
-            console.log('error was', err);
             this.pendingClients.delete(tempId);
             throw err;
         }
     }
 
     // TODO: refactor this and adding games
-    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number }>, gameType, gameId, areaData: any, gameData: any) {
+    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number }>, gameType, gameId, gameData: any, areaData: any) {
 
         if(gameId in this.gamesById) {
             throw `gameId: ${gameId} is being added for a second time. The first reference was ${this.gamesById[gameId]}`
@@ -210,7 +209,6 @@ export class Gate {
         this.availableGamesByType[gameType][gameId] = this.gamesById[gameId];
         this.publicGateDataChanged = true;
     }
-
 
     private addConnector(host, port, serverIndex, gameId) : ConnectorData {
 
@@ -383,7 +381,6 @@ export class Gate {
     private async addPlayerToConnector(serverIndex, auth?, clientJoinOptions?) : Promise<any> {
         const connectorData = this.connectorsByServerIndex[serverIndex];
         try {
-            console.log('sending reserve seat....');
             const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, clientJoinOptions);
             connectorData.connectedClients++;
             //sorts

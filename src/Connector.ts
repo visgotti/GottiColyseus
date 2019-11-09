@@ -142,7 +142,6 @@ export abstract class Connector extends EventEmitter {
         } else {
             throw 'please use http or net as server option'
         }
-        console.log('port was', this.port);
 
         this.responder = new Responder({
             response: true,
@@ -175,14 +174,11 @@ export abstract class Connector extends EventEmitter {
 
     protected onConnection = (client: Client, req: http.IncomingMessage & any) => {
         client.pingCount = 0;
-        console.log('got on conn request as');
 
         const upgradeReq = req || client.upgradeReq;
         const url = parseURL(upgradeReq.url);
         const query = parseQueryString(url.query);
-        console.log('query was', query);
         req.gottiId = query.gottiId;
-        console.log('req.gottiId was', req.gottiId);
 
         if(!(client) || !(req.gottiId) || !(this.reservedSeats[req.gottiId]) ) {
             send(client, [Protocol.JOIN_CONNECTOR_ERROR])
@@ -235,7 +231,6 @@ export abstract class Connector extends EventEmitter {
 
                     this.registerChannelMessages();
                     this.server = new WebSocket.Server(this.options);
-                    console.log('registered websocket server');
                     this.server.on('connection', this.onConnection.bind(this));
                     this.on('connection', this.onConnection.bind(this)); // used for testing
                     this.startMessageRelay();
@@ -414,7 +409,6 @@ export abstract class Connector extends EventEmitter {
             } else if (protocol === Protocol.SIGNAL_FAILED) {
                 // [protocol, fromPlayerIndex, toPlayerGottiId, options])
                 const toClient = this.clientsById[message[2]];
-                console.log('GOT FAILED PEER CONNECTION REQUEST BACK FROM RELAY');
                 if(toClient) {
                     // [protocol, fromPlayerIndex, options?]
                     send(toClient, [protocol, message[1], message[2]]);
@@ -423,7 +417,6 @@ export abstract class Connector extends EventEmitter {
             else if(protocol === Protocol.PEER_CONNECTION_REQUEST) {
                 //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, systemName, requestOptions, toPlayerrGottiId], toPlayerData.connectorId)
                 const toClient = this.clientsById[message[5]];
-                console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
                 if(toClient) {
                     // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
                     send(toClient, [protocol, message[1], message[2], message[3], message[4]])
@@ -465,7 +458,14 @@ export abstract class Connector extends EventEmitter {
 
 
     private async _getInitialWriteArea(client, clientOptions?: any) : Promise<boolean> {
+        const oldAreaId = client.channelClient.processorChannel;
+        if(oldAreaId) {
+            send(client, Protocol.WRITE_AREA_ERROR);
+            return false;
+        }
+        console.log('running get initialWriteArea');
         const write = this.getInitialWriteArea(client, this.areaData, clientOptions);
+        console.log('write area id was', write.areaId);
         if(write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);
@@ -554,9 +554,6 @@ export abstract class Connector extends EventEmitter {
      * @returns {boolean}
      */
     private async changeAreaWrite(client, newAreaId, writeOptions) : Promise<boolean> {
-
-        const oldAreaId = client.channelClient.processorChannel;
-
         let isLinked = client.channelClient.isLinkedToChannel(newAreaId);
         if(!(isLinked)) {
             isLinked = await this.addAreaListen(client, newAreaId, writeOptions);
@@ -584,7 +581,6 @@ export abstract class Connector extends EventEmitter {
         // clear the timeout and remove the reserved seat since player joined
         clearTimeout(this.reservedSeats[client.gottiId].timeout);
         delete this.reservedSeats[client.gottiId];
-        console.log('got onjoin');
         // add a channelClient to client
         client.channelClient = new ChannelClient(client.gottiId, this.masterChannel);
         // register channel/area message handlers

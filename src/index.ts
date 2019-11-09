@@ -6,6 +6,7 @@ export { MasterServer } from './MasterServer';
 export { Config } from './Config';
 export { RelayServer } from './RelayServer';
 export { WebServer } from './Web';
-export { Authentication as AuthWebServer } from './WebServers/Authentication';
+import Authentication from "./WebServers/Authentication";
+export { Authentication as AuthWebServer };
 export { GateWebServer } from './WebServers/Gate'
 export { Proxy } from './Proxy';

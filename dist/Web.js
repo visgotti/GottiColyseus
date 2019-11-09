@@ -6,7 +6,7 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const path = require('path');
 const helmet = require('helmet');
-const Authentication_1 = require("./WebServers/Authentication");
+const _1 = require("./");
 const Gate_1 = require("./WebServers/Gate");
 const Base_1 = require("./WebServers/Base");
 class WebServer extends Base_1.BaseWebServer {
@@ -47,9 +47,8 @@ class WebServer extends Base_1.BaseWebServer {
             });
         });
     }
-    async hostAuth(gateURI) {
-        this.auth = new Authentication_1.Authentication(gateURI);
-        return this.auth.init(this.app);
+    hostAuth(gateURI, authSessionTimeout) {
+        this.auth = new _1.AuthWebServer(gateURI, this.port, this.app, authSessionTimeout);
     }
     async hostGate(gateURI) {
         this.gate = new Gate_1.GateWebServer(gateURI);

@@ -19,6 +19,7 @@ export abstract class MasterServer {
     private connectorsByServerIndex: { [serverIndex: number]: ConnectorData } = {};
     private masterChannel: BackMaster = null;
     private channel: BackChannel = null;
+    public dispatchGlobal: (data) => void;
 
     constructor(options: MasterConfig) {
         this.masterChannel = new BackMaster(GOTTI_MASTER_SERVER_INDEX);
@@ -26,6 +27,9 @@ export abstract class MasterServer {
         this.masterChannel.addChannels([GOTTI_MASTER_CHANNEL_ID]);
         this.channel = this.masterChannel.backChannels[GOTTI_MASTER_CHANNEL_ID];
 
+        this.masterChannel.messenger.createPublish(Protocol.GLOBAL_MASTER_MESSAGE.toString());
+
+        this.dispatchGlobal = this.masterChannel.messenger.publications[Protocol.GLOBAL_MASTER_MESSAGE.toString()];
         this.channel.onMessage((message) => {
             if(message[0] === Protocol.AREA_TO_MASTER_MESSAGE) {
                 this.onAreaMessage(message[1], message[2]);
@@ -76,6 +80,4 @@ export abstract class MasterServer {
     }
     public abstract onConnectorMessage(client: Client, message: any): void;
     public abstract onAreaMessage(areaId: Client, message: any): void;
-
-
 }

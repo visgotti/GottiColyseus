@@ -8,14 +8,14 @@ const helmet = require('helmet');
 
 import { generateId } from "./Util";
 
-import { Authentication } from './WebServers/Authentication';
+import { AuthWebServer } from './';
 import { GateWebServer } from './WebServers/Gate';
 import { BaseWebServer } from "./WebServers/Base";
 
 export class WebServer extends BaseWebServer {
     public app: any;
     public gate: GateWebServer;
-    public auth: Authentication;
+    public auth: any;
     private isInitialized: boolean = false;
     private server: any;
     readonly publicPath: string;
@@ -62,9 +62,8 @@ export class WebServer extends BaseWebServer {
         })
     }
 
-    public async hostAuth(gateURI) {
-        this.auth = new Authentication(gateURI);
-        return this.auth.init(this.app);
+    public hostAuth(gateURI, authSessionTimeout?) {
+        this.auth = new AuthWebServer(gateURI, this.port, this.app, authSessionTimeout);
     }
 
     public async hostGate(gateURI) {
