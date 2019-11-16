@@ -14,7 +14,6 @@ declare class AuthenticationBase extends BaseWebServer {
     readonly port: number;
     private authTimeout;
     private authMap;
-    private dataHandler;
     readonly data: any;
     constructor(gateURI: any, port: any, app?: any, sessionTimeout?: any);
     init(dataInitHandler?: any, masterURI?: any): Promise<boolean>;
@@ -23,6 +22,7 @@ declare class AuthenticationBase extends BaseWebServer {
     addOnRegister(handler: any): void;
     private setClientAuth;
     addHandler(route: any, handler: any): void;
+    private hearbeatAuth;
     private removeOldAuth;
     onRegister(req: any, res: any): Promise<any>;
     onAuth(req: any, res: any): Promise<any>;

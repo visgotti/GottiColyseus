@@ -1,4 +1,4 @@
-import {generateId} from "../Util";
+import {httpErrorHandler} from "../Util";
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -16,6 +16,7 @@ import {
     GOTTI_HTTP_ROUTES,
     GOTTI_ROUTE_BODY_PAYLOAD
 } from "../Protocol";
+
 
 type AuthMasterHandler = (message: any) => void;
 
@@ -39,7 +40,6 @@ class AuthenticationBase extends BaseWebServer {
     readonly port: number;
     private authTimeout: number = 1000 * 60 * 60 * 12; // 12 hours
     private authMap: Map<string, any> = new Map();
-    private dataHandler: any;
 
     readonly data: any = {};
 
@@ -111,18 +111,26 @@ class AuthenticationBase extends BaseWebServer {
         if(!this.app) {
             throw new Error('Cannot add route since theres no express server initialized on web server')
         }
-        this.app.post(route, async (req, res) => {
+        this.app.post(`${GOTTI_HTTP_ROUTES.BASE_AUTH}/${route}`, async (req, res) => {
             const authId = req.body[GOTTI_GATE_AUTH_ID];
+            if(!authId) {
+                return res.status(503).json('Not authenticated.');
+            }
             const auth = this.authMap.get(authId);
             if(!auth) {
-                return res.status(503).json({ error: 'not authenticated' });
+                return res.status(503).json('not authenticated');
             }
-            return Promise.resolve(handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], auth)).then((responseObject) => {
-                return res.json({ responseObject });
-            }).catch(err => {
-                return res.json({error: err})
-            })
+            try {
+                return Promise.resolve(handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], auth.auth)).then((responseObject) => {
+                    return res.json({[GOTTI_ROUTE_BODY_PAYLOAD]: responseObject });
+                });
+            } catch(err) {
+                return httpErrorHandler(res, err);
+            }
         })
+    }
+
+    private hearbeatAuth(authId) {
     }
 
     private removeOldAuth(oldAuthId) {
@@ -155,7 +163,7 @@ class AuthenticationBase extends BaseWebServer {
                     return res.send(503)
                 }
             } catch(err) {
-                return res.send(503);
+                return httpErrorHandler(res, err);
             }
         } else {
             return res.send('onRegister was not handled');
@@ -169,7 +177,7 @@ class AuthenticationBase extends BaseWebServer {
 
                 const auth = await this.onAuthHandler(req.body[GOTTI_AUTH_KEY], req);
                 if(!auth) {
-                    return res.send(503)
+                    return res.sendStatus(503)
                 }
                 const authId = await this.reserveGateRequest({
                     auth,
@@ -194,13 +202,13 @@ class AuthenticationBase extends BaseWebServer {
                         [GOTTI_AUTH_KEY]: auth,
                     })
                 } else {
-                    return res.send(503)
+                    return res.sendStatus(503)
                 }
             } catch(err) {
-                return res.send(503);
+                return httpErrorHandler(res, err);
             }
         } else {
-            return res.send('onAuth was not handled');
+            return res.status(500).json('onAuth was not handled');
         }
     }
 }

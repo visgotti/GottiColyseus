@@ -11,6 +11,11 @@ export function registerGracefulShutdown(callback) {
         process.once(signal, () => callback(signal)));
 }
 
+export function httpErrorHandler(res, err, code=500) {
+    err = (typeof err === 'object' && err.message) ? err.message : err;
+    return res.status(code).json(err);
+}
+
 export function retry(
     cb: Function,
     maxRetries: number = 3,

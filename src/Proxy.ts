@@ -10,7 +10,8 @@ const proxy = require('http-proxy-middleware');
 export class Proxy {
     private app: any;
     private proxyPort: number;
-    private currentWebUrlIdx = 0;
+    private currentWebContentIdx = 0;
+    private currentWebApiIdx = 0;
     private authUrl: string;
     private gateUrl: string;
     private webUrls: Array<string>;
@@ -24,18 +25,25 @@ export class Proxy {
     }
 
     private getContentHostRoundRobin() {
-        if(this.currentWebUrlIdx === this.webUrls.length) this.currentWebUrlIdx = 0;
-        return this.webUrls[this.currentWebUrlIdx++];
+        if(this.currentWebContentIdx === this.webUrls.length) this.currentWebContentIdx = 0;
+        return this.webUrls[this.currentWebContentIdx++];
+    }
+    private getApiHostRoundRobin() {
+        if(this.currentWebApiIdx === this.webUrls.length) this.currentWebApiIdx = 0;
+        return this.webUrls[this.currentWebApiIdx++];
     }
 
     public async init() {
         this.app.use(helmet());
         this.app.use(`${GOTTI_HTTP_ROUTES.BASE_AUTH}`, proxy({ target: this.authUrl }));
         this.app.use(`${GOTTI_HTTP_ROUTES.BASE_GATE}`, proxy({ target: this.gateUrl }));
-
+        this.app.use(`${GOTTI_HTTP_ROUTES.BASE_PUBLIC_API}`, proxy({
+            router: this.getApiHostRoundRobin(),
+            target: this.webUrls[this.currentWebContentIdx],
+        }));
         this.app.use('/', proxy({
             router: this.getContentHostRoundRobin.bind(this),
-            target: this.webUrls[this.currentWebUrlIdx],
+            target: this.webUrls[this.currentWebContentIdx],
         }));
 
         return new Promise((resolve, reject) => {

@@ -1,3 +1,5 @@
+import {httpErrorHandler} from "../Util";
+
 import {BaseWebServer} from "./Base";
 
 const express = require('express');
@@ -43,16 +45,19 @@ export class GateWebServer extends BaseWebServer{
         }
         this.app.post(route, async (req, res) => {
             try {
-                const authId = req.body[GOTTI_GATE_AUTH_ID];
-                const auth = await this.gate.getPlayerAuth(authId);
-                if(!auth) {
-                    return res.status(503).json({ error: 'not authenticated' });
-                }
-                const responseObject = await handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], this.gate.publicGateData, auth);
-                return res.json(responseObject);
-            } catch (err) {
-                const msg = err.message ? err.message : err;
-                return res.status(401).json({ error: msg });
+            const authId = req.body[GOTTI_GATE_AUTH_ID];
+            if(!authId) {
+                return res.status(503).json('Not authenticated.');
+            }
+            const auth = this.gate.getPlayerAuth(authId);
+            if(!auth) {
+                return res.status(503).json('not authenticated');
+            }
+            const responseObject = await handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], this.gate.publicGateData, auth);
+            return res.json({[GOTTI_ROUTE_BODY_PAYLOAD]: responseObject });
+
+            } catch(err) {
+                return httpErrorHandler(res, err);
             }
         })
     }

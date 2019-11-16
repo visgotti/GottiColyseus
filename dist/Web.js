@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const http = require('http');
 const path = require('path');
 const helmet = require('helmet');
+const Util_1 = require("./Util");
 const _1 = require("./");
 const Gate_1 = require("./WebServers/Gate");
 const Base_1 = require("./WebServers/Base");
@@ -19,15 +20,14 @@ class WebServer extends Base_1.BaseWebServer {
         this.port = port;
     }
     addHandler(route, handler) {
-        this.app.post(`/${route}`, async (req, res) => {
+        this.app.post(`${Protocol_1.GOTTI_HTTP_ROUTES.BASE_PUBLIC_API}/${route}`, async (req, res) => {
             try {
                 const clientRequestOptions = req.body[Protocol_1.GOTTI_ROUTE_BODY_PAYLOAD];
                 const response = await handler(clientRequestOptions);
-                return res.send(200).json(response);
+                return res.json({ [Protocol_1.GOTTI_ROUTE_BODY_PAYLOAD]: response });
             }
             catch (err) {
-                const msg = err.message ? err.message : err;
-                return res.send(401).json(msg);
+                Util_1.httpErrorHandler(res, err);
             }
         });
     }

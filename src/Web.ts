@@ -1,4 +1,4 @@
-import {GOTTI_ROUTE_BODY_PAYLOAD} from "./Protocol";
+import {GOTTI_ROUTE_BODY_PAYLOAD, GOTTI_HTTP_ROUTES} from "./Protocol";
 
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -6,7 +6,7 @@ const http = require('http');
 const path = require('path');
 const helmet = require('helmet');
 
-import { generateId } from "./Util";
+import { httpErrorHandler } from "./Util";
 
 import { AuthWebServer } from './';
 import { GateWebServer } from './WebServers/Gate';
@@ -31,14 +31,13 @@ export class WebServer extends BaseWebServer {
     }
 
     public addHandler(route: string, handler: Function) {
-        this.app.post(`/${route}`, async (req, res) => {
+        this.app.post(`${GOTTI_HTTP_ROUTES.BASE_PUBLIC_API}/${route}`, async (req, res) => {
             try {
                 const clientRequestOptions = req.body[GOTTI_ROUTE_BODY_PAYLOAD];
                 const response = await handler(clientRequestOptions);
-                return res.send(200).json(response);
+                return res.json({[GOTTI_ROUTE_BODY_PAYLOAD]: response });
             } catch(err) {
-                const msg = err.message ? err.message : err;
-                return res.send(401).json(msg);
+                httpErrorHandler(res, err);
             }
         });
     }

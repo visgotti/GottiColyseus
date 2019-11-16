@@ -13,6 +13,7 @@ exports.GOTTI_HTTP_ROUTES = {
     AUTHENTICATE: '/gotti_authenticate',
     REGISTER: '/gotti_register',
     BASE_GATE: '/gotti_gate',
+    BASE_PUBLIC_API: '/gotti_api',
     GET_GAMES: '/gotti_games',
     JOIN_GAME: '/gotti_join_game'
 };

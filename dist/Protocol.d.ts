@@ -67,6 +67,7 @@ export declare const GOTTI_HTTP_ROUTES: {
     AUTHENTICATE: string;
     REGISTER: string;
     BASE_GATE: string;
+    BASE_PUBLIC_API: string;
     GET_GAMES: string;
     JOIN_GAME: string;
 };

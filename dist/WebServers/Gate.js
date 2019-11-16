@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const Util_1 = require("../Util");
 const Base_1 = require("./Base");
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -21,16 +22,18 @@ class GateWebServer extends Base_1.BaseWebServer {
         this.app.post(route, async (req, res) => {
             try {
                 const authId = req.body[Protocol_1.GOTTI_GATE_AUTH_ID];
-                const auth = await this.gate.getPlayerAuth(authId);
+                if (!authId) {
+                    return res.status(503).json('Not authenticated.');
+                }
+                const auth = this.gate.getPlayerAuth(authId);
                 if (!auth) {
-                    return res.status(503).json({ error: 'not authenticated' });
+                    return res.status(503).json('not authenticated');
                 }
                 const responseObject = await handler(req.body[Protocol_1.GOTTI_ROUTE_BODY_PAYLOAD], this.gate.publicGateData, auth);
-                return res.json(responseObject);
+                return res.json({ [Protocol_1.GOTTI_ROUTE_BODY_PAYLOAD]: responseObject });
             }
             catch (err) {
-                const msg = err.message ? err.message : err;
-                return res.status(401).json({ error: msg });
+                return Util_1.httpErrorHandler(res, err);
             }
         });
     }

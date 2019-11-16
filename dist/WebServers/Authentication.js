@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const Util_1 = require("../Util");
 const express = require('express');
 const bodyParser = require('body-parser');
 const helmet = require('helmet');
@@ -73,18 +74,26 @@ class AuthenticationBase extends Base_1.BaseWebServer {
         if (!this.app) {
             throw new Error('Cannot add route since theres no express server initialized on web server');
         }
-        this.app.post(route, async (req, res) => {
+        this.app.post(`${Protocol_1.GOTTI_HTTP_ROUTES.BASE_AUTH}/${route}`, async (req, res) => {
             const authId = req.body[Protocol_1.GOTTI_GATE_AUTH_ID];
+            if (!authId) {
+                return res.status(503).json('Not authenticated.');
+            }
             const auth = this.authMap.get(authId);
             if (!auth) {
-                return res.status(503).json({ error: 'not authenticated' });
+                return res.status(503).json('not authenticated');
             }
-            return Promise.resolve(handler(req.body[Protocol_1.GOTTI_ROUTE_BODY_PAYLOAD], auth)).then((responseObject) => {
-                return res.json({ responseObject });
-            }).catch(err => {
-                return res.json({ error: err });
-            });
+            try {
+                return Promise.resolve(handler(req.body[Protocol_1.GOTTI_ROUTE_BODY_PAYLOAD], auth.auth)).then((responseObject) => {
+                    return res.json({ [Protocol_1.GOTTI_ROUTE_BODY_PAYLOAD]: responseObject });
+                });
+            }
+            catch (err) {
+                return Util_1.httpErrorHandler(res, err);
+            }
         });
+    }
+    hearbeatAuth(authId) {
     }
     removeOldAuth(oldAuthId) {
         if (oldAuthId) {
@@ -118,7 +127,7 @@ class AuthenticationBase extends Base_1.BaseWebServer {
                 }
             }
             catch (err) {
-                return res.send(503);
+                return Util_1.httpErrorHandler(res, err);
             }
         }
         else {
@@ -131,7 +140,7 @@ class AuthenticationBase extends Base_1.BaseWebServer {
                 const oldAuthId = req.body[Protocol_1.GOTTI_GATE_AUTH_ID];
                 const auth = await this.onAuthHandler(req.body[Protocol_1.GOTTI_AUTH_KEY], req);
                 if (!auth) {
-                    return res.send(503);
+                    return res.sendStatus(503);
                 }
                 const authId = await this.reserveGateRequest({
                     auth,
@@ -157,15 +166,15 @@ class AuthenticationBase extends Base_1.BaseWebServer {
                     });
                 }
                 else {
-                    return res.send(503);
+                    return res.sendStatus(503);
                 }
             }
             catch (err) {
-                return res.send(503);
+                return Util_1.httpErrorHandler(res, err);
             }
         }
         else {
-            return res.send('onAuth was not handled');
+            return res.status(500).json('onAuth was not handled');
         }
     }
 }
