@@ -15,17 +15,21 @@ declare class AuthenticationBase extends BaseWebServer {
     private authTimeout;
     private authMap;
     readonly data: any;
+    private authApi;
     constructor(gateURI: any, port: any, app?: any, sessionTimeout?: any);
     init(dataInitHandler?: any, masterURI?: any): Promise<boolean>;
     addOnMasterMessageHandler(handler: any): void;
     addOnAuth(handler: any): void;
     addOnRegister(handler: any): void;
-    private setClientAuth;
+    private makeRequestApi;
     addHandler(route: any, handler: any): void;
-    private hearbeatAuth;
-    private removeOldAuth;
+    private getAuth;
+    private updateAuth;
+    private refreshAuth;
     onRegister(req: any, res: any): Promise<any>;
     onAuth(req: any, res: any): Promise<any>;
+    private removeOldAuth;
+    private addAuthToMap;
 }
 declare const Authentication: {
     new (...args: any[]): {

@@ -43,6 +43,8 @@ class AuthenticationBase extends BaseWebServer {
 
     readonly data: any = {};
 
+    private authApi: any;
+
     constructor(gateURI, port, app?, sessionTimeout?) {
         super();
         this.authTimeout = sessionTimeout ? sessionTimeout : this.authTimeout;
@@ -91,20 +93,12 @@ class AuthenticationBase extends BaseWebServer {
         this.onRegisterHandler = handler;
     }
 
-    private async setClientAuth(req, authObject) {
-        const oldAuthId = req.body[GOTTI_GATE_AUTH_ID];
-        const newAuthId = await this.reserveGateRequest({
-            auth: authObject,
-            oldAuthId
-        });
-
-        this.removeOldAuth(oldAuthId);
-
-        req['GOTTI_AUTH'] = {
-            [GOTTI_GATE_AUTH_ID]: newAuthId,
-            [GOTTI_AUTH_KEY]: authObject
-        };
-        return authObject;
+    private makeRequestApi(req, authId) : { refreshAuth: (authId: string) => Promise<boolean>, updateAuth: (authId: string, newAuthData: any) => Promise<boolean>, getAuth: (authId: string) => Promise<any> } {
+        return {
+            refreshAuth: this.refreshAuth.bind(this, req, authId),
+            updateAuth: this.updateAuth.bind(this, req, authId),
+            getAuth: this.getAuth.bind(this)
+        }
     }
 
     public addHandler(route, handler) {
@@ -121,8 +115,11 @@ class AuthenticationBase extends BaseWebServer {
                 return res.status(503).json('not authenticated');
             }
             try {
-                return Promise.resolve(handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], auth.auth)).then((responseObject) => {
-                    return res.json({[GOTTI_ROUTE_BODY_PAYLOAD]: responseObject });
+                return Promise.resolve(handler(req.body[GOTTI_ROUTE_BODY_PAYLOAD], auth.auth, this.makeRequestApi(req, authId))).then((responseObject) => {
+                    const response = {[GOTTI_ROUTE_BODY_PAYLOAD]: responseObject };
+                    if(req[GOTTI_AUTH_KEY]) response[GOTTI_AUTH_KEY] = req[GOTTI_AUTH_KEY];
+                    if(req[GOTTI_GATE_AUTH_ID]) response[GOTTI_GATE_AUTH_ID] = req[GOTTI_GATE_AUTH_ID];
+                    return res.json(response);
                 });
             } catch(err) {
                 return httpErrorHandler(res, err);
@@ -130,20 +127,58 @@ class AuthenticationBase extends BaseWebServer {
         })
     }
 
-    private hearbeatAuth(authId) {
+    private getAuth(authId) {
+        const auth = this.authMap.get(authId);
+        if(auth) {
+            return auth.auth;
+        }
     }
 
-    private removeOldAuth(oldAuthId) {
-        if(oldAuthId) {
-            const old = this.authMap.get(oldAuthId);
-            if(old) {
-                clearTimeout(old.timeout);
-                this.authMap.delete(oldAuthId);
-                return true;
+    private async updateAuth(req, authId, newAuthData, timeout?) {
+        try {
+            const obj : any = {
+                auth: newAuthData,
+                oldAuthId: authId
+            };
+            if(timeout) {
+                obj.timeout = timeout;
+            };
+            const newAuthId = await this.reserveGateRequest(obj);
+            if(newAuthId) {
+                this.addAuthToMap(authId, newAuthId, newAuthData);
+                req[GOTTI_GATE_AUTH_ID] = newAuthId;
+                req[GOTTI_AUTH_KEY] = newAuthData;
+                return newAuthId;
             }
+            return false;
+        } catch(err) {
+            return false;
         }
-        return false;
     }
+
+    private async refreshAuth(req, authId, timeout?) {
+        const oldAuth = this.authMap.get(authId);
+        if(oldAuth) {
+            try {
+                const obj : any = {
+                    refresh: true,
+                    oldAuthId: authId
+                };
+                if(timeout) {
+                  obj.timeout = timeout;
+                };
+                const newAuthId = await this.reserveGateRequest(obj);
+                this.addAuthToMap(authId, newAuthId, oldAuth.auth);
+                req[GOTTI_GATE_AUTH_ID] = newAuthId;
+                return newAuthId;
+            } catch (err) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
     public async onRegister(req, res) {
         if(this.onRegisterHandler) {
             try {
@@ -174,8 +209,12 @@ class AuthenticationBase extends BaseWebServer {
         if(this.onAuthHandler) {
             try {
                 const oldAuthId = req.body[GOTTI_GATE_AUTH_ID];
-
-                const auth = await this.onAuthHandler(req.body[GOTTI_AUTH_KEY], req);
+                const api =  this.makeRequestApi(req, null);
+                // only need the getAuth for api in onAuth since the return value
+                // is basically the same logic of both of these.
+                delete api['refreshAuth'];
+                delete api['updateAuth'];
+                const auth = await this.onAuthHandler(req.body[GOTTI_AUTH_KEY], api, req);
                 if(!auth) {
                     return res.sendStatus(503)
                 }
@@ -184,19 +223,7 @@ class AuthenticationBase extends BaseWebServer {
                     oldAuthId
                 });
                 if(authId) {
-                    if(oldAuthId) {
-                        const old = this.authMap.get(oldAuthId);
-                        if(old) {
-                            clearTimeout(old.timeout);
-                            this.authMap.delete(oldAuthId);
-                        }
-                    }
-                    this.authMap.set(authId, {
-                        auth,
-                        timeout: setTimeout(() => {
-                            this.authMap.delete(authId);
-                        }, this.authTimeout)
-                    });
+                    this.addAuthToMap(oldAuthId, authId, auth);
                     return res.json({
                         [GOTTI_GATE_AUTH_ID]: authId,
                         [GOTTI_AUTH_KEY]: auth,
@@ -210,6 +237,28 @@ class AuthenticationBase extends BaseWebServer {
         } else {
             return res.status(500).json('onAuth was not handled');
         }
+    }
+
+    private removeOldAuth(oldAuthId) {
+        if(oldAuthId) {
+            const auth = this.authMap.get(oldAuthId);
+            if(auth) {
+                clearTimeout(auth.timeout);
+                this.authMap.delete(oldAuthId);
+                return true;
+            }
+        }
+        return false;
+    }
+    private addAuthToMap(oldAuthId, newAuthId, newAuthData, timeout?) {
+        timeout = timeout ? timeout : this.authTimeout;
+        this.removeOldAuth(oldAuthId);
+        this.authMap.set(newAuthId, {
+            auth: newAuthData,
+            timeout: setTimeout(() => {
+                this.authMap.delete(newAuthId);
+            }, timeout)
+        })
     }
 }
 const Authentication = MasterServerListener(AuthenticationBase);

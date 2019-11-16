@@ -56,7 +56,8 @@ export declare const enum GateProtocol {
     RESERVE_PLAYER_SEAT = "1",
     HEARTBEAT = "2",
     RESERVE_AUTHENTICATION = "3",
-    GET_AUTHENTICATION = "4"
+    GET_AUTHENTICATION = "4",
+    UPDATE_AUTHENTICATION = "5"
 }
 export declare enum StateProtocol {
     SET = 0,

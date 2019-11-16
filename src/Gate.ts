@@ -479,22 +479,38 @@ export class Gate {
 
     private registerAuthResponders() {
         this.responder.createResponse(GOTTI_GATE_CHANNEL_PREFIX + '-' + GateProtocol.RESERVE_AUTHENTICATION, (data) => {
-            const { auth, oldAuthId } = data;
+            const { auth, oldAuthId, refresh } = data;
+            const timeout = data.timeout ? data.timeout : this.authTimeout;
+            let old = null;
             if(oldAuthId) {
-                const old = this.authMap.get(oldAuthId);
+                old = this.authMap.get(oldAuthId);
                 if(old) {
                     clearTimeout(old.timeout);
                     this.authMap.delete(oldAuthId);
                 }
             }
 
+            // trying to refresh an old auth that didnt exist. return early with false.
+            if(refresh && !old) {
+                return false;
+            }
             const newAuthKey = generateId(9);
-            this.authMap.set(newAuthKey, {
-                auth,
-                timeout: setTimeout(() => {
-                    this.authMap.delete(newAuthKey);
-                }, this.authTimeout)
-            })
+            if(refresh) {
+                this.authMap.set(newAuthKey, {
+                    auth: old.auth,
+                    timeout: setTimeout(() => {
+                        this.authMap.delete(newAuthKey);
+                    }, timeout)
+                })
+            } else {
+                this.authMap.set(newAuthKey, {
+                    auth,
+                    timeout: setTimeout(() => {
+                        this.authMap.delete(newAuthKey);
+                    }, timeout)
+                })
+            }
+
             return newAuthKey
         });
     }

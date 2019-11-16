@@ -88,6 +88,7 @@ export const enum GateProtocol {
     HEARTBEAT = '2',
     RESERVE_AUTHENTICATION = '3',
     GET_AUTHENTICATION = '4',
+    UPDATE_AUTHENTICATION = '5',
 }
 
 export enum StateProtocol {
