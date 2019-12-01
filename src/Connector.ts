@@ -250,7 +250,7 @@ export abstract class Connector extends EventEmitter {
     public onMasterMessage?(message: any) : void;
 
     // hook that gets ran when a client successfully joins the reserved seat.
-    public onJoin?(client: Client): any | Promise<any>;
+    public onJoin?(client: Client, setArea): any | Promise<any>;
     public onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     public onDispose?(): void | Promise<any>;
 
@@ -590,7 +590,7 @@ export abstract class Connector extends EventEmitter {
         client.auth = auth;
         client.joinOptions = joinOptions;
         if(this.onJoin) {
-            client.joinedOptions = this.onJoin(client)
+            client.joinedOptions = this.onJoin(client, this.changeAreaWrite.bind(this, client))
         }
         client.auth = auth;
         send(client, [ Protocol.JOIN_CONNECTOR, client.joinedOptions ]);

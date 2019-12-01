@@ -16,7 +16,7 @@ export class Proxy {
     private gateUrl: string;
     private webUrls: Array<string>;
     private server: any;
-    constructor(domain, authUrl, gateUrl, webUrls, proxyPort=80) {
+    constructor(authUrl, gateUrl, webUrls, proxyPort=80) {
         this.authUrl = authUrl;
         this.gateUrl = gateUrl;
         this.webUrls = webUrls;

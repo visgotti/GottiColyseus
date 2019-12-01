@@ -460,7 +460,7 @@ class Connector extends events_1.EventEmitter {
         client.auth = auth;
         client.joinOptions = joinOptions;
         if (this.onJoin) {
-            client.joinedOptions = this.onJoin(client);
+            client.joinedOptions = this.onJoin(client, this.changeAreaWrite.bind(this, client));
         }
         client.auth = auth;
         Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, client.joinedOptions]);

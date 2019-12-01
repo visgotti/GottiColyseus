@@ -3,8 +3,7 @@
 // 2. if a client wants to send a p2p message the relay server will act as a middleground and find which connector server a peer lives on the forward the message
 
 import {BackChannel, BackMaster} from 'gotti-channels/dist';
-import {Protocol, GOTTI_RELAY_SERVER_INDEX, GOTTI_RELAY_CHANNEL_ID} from "./Protocol";
-
+import {Protocol, GOTTI_RELAY_SERVER_INDEX, GOTTI_RELAY_CHANNEL_ID} from "./Protocol"
 
 export type PlayerData = {
     gottiId: string,

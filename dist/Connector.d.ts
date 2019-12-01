@@ -71,7 +71,7 @@ export declare abstract class Connector extends EventEmitter {
     abstract onMessage(client: Client, message: any): void;
     onInit?(options: any): void;
     onMasterMessage?(message: any): void;
-    onJoin?(client: Client): any | Promise<any>;
+    onJoin?(client: Client, setArea: any): any | Promise<any>;
     onLeave?(client: Client, consented?: boolean): void | Promise<any>;
     onDispose?(): void | Promise<any>;
     /**

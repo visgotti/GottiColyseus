@@ -190,6 +190,7 @@ class AuthenticationBase extends BaseWebServer {
                     auth,
                 });
                 if(authId) {
+                    this.addAuthToMap(null, authId, auth);
                     return res.json({
                         [GOTTI_GATE_AUTH_ID]: authId,
                         [GOTTI_AUTH_KEY]: auth,

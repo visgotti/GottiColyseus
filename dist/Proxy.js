@@ -8,7 +8,7 @@ const path = require('path');
 const helmet = require('helmet');
 const proxy = require('http-proxy-middleware');
 class Proxy {
-    constructor(domain, authUrl, gateUrl, webUrls, proxyPort = 80) {
+    constructor(authUrl, gateUrl, webUrls, proxyPort = 80) {
         this.currentWebContentIdx = 0;
         this.currentWebApiIdx = 0;
         this.authUrl = authUrl;
