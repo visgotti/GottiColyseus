@@ -15,7 +15,8 @@ exports.GOTTI_HTTP_ROUTES = {
     BASE_GATE: '/gotti_gate',
     BASE_PUBLIC_API: '/gotti_api',
     GET_GAMES: '/gotti_games',
-    JOIN_GAME: '/gotti_join_game'
+    JOIN_GAME: '/gotti_join_game',
+    CONNECTOR: '/gotti_connector'
 };
 exports.GOTTI_ROUTE_BODY_PAYLOAD = '__GOTTI_ROUTE_BODY_PAYLOAD__';
 exports.GOTTI_GET_GAMES_OPTIONS = '__GOTTI_GET_GAMES_OPTIONS__';

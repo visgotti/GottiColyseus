@@ -71,6 +71,7 @@ export declare const GOTTI_HTTP_ROUTES: {
     BASE_PUBLIC_API: string;
     GET_GAMES: string;
     JOIN_GAME: string;
+    CONNECTOR: string;
 };
 export declare const GOTTI_ROUTE_BODY_PAYLOAD = "__GOTTI_ROUTE_BODY_PAYLOAD__";
 export declare const GOTTI_GET_GAMES_OPTIONS = "__GOTTI_GET_GAMES_OPTIONS__";

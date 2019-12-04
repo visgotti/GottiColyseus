@@ -95,12 +95,11 @@ class Gate {
             if (result && result.gottiId) {
                 this.pendingClients.delete(tempId);
                 this.connectedClients.set(result.gottiId, connectorServerIndex);
-                const { host, port } = this.connectorsByServerIndex[connectorServerIndex];
+                const { proxyId } = this.connectorsByServerIndex[connectorServerIndex];
                 return {
                     gottiId: result.gottiId,
                     playerIndex,
-                    host,
-                    port,
+                    proxyId
                 };
             }
             else {
@@ -120,8 +119,8 @@ class Gate {
         }
         const gameConnectorsData = [];
         connectorsData.forEach((data) => {
-            const { serverIndex, host, port } = data;
-            gameConnectorsData.push(this.addConnector(host, port, serverIndex, gameId));
+            const { serverIndex, host, port, proxyId } = data;
+            gameConnectorsData.push(this.addConnector(host, port, serverIndex, gameId, proxyId));
         });
         this.gamesById[gameId] = {
             id: gameId,
@@ -136,7 +135,7 @@ class Gate {
         this.availableGamesByType[gameType][gameId] = this.gamesById[gameId];
         this.publicGateDataChanged = true;
     }
-    addConnector(host, port, serverIndex, gameId) {
+    addConnector(host, port, serverIndex, gameId, proxyId) {
         const formatError = () => { return `error when adding connector SERVER_INDEX#: ${serverIndex}, host: ${host}, port: ${port} game ID:${gameId}`; };
         if (serverIndex in this.connectorsByServerIndex) {
             throw new Error(`${formatError()} because server index is already in connectors`);
@@ -145,8 +144,12 @@ class Gate {
             if (this.connectorsByServerIndex[serverIndex].host === host && this.connectorsByServerIndex[serverIndex].port === port) {
                 throw new Error(`${formatError()} because another connector already has the host and port`);
             }
+            if (this.connectorsByServerIndex[serverIndex].proxyId === proxyId) {
+                throw new Error(`${formatError()} because another connector already has the proxy id ${proxyId}`);
+            }
         }
         this.connectorsByServerIndex[serverIndex] = {
+            proxyId,
             host,
             port,
             serverIndex,
@@ -180,9 +183,9 @@ class Gate {
             return res.status(validated.code).json(validated.error);
         }
         const { gameType } = validated;
-        const { host, port, gottiId, playerIndex, gameData, areaData } = await this.matchMake(gameType, clientAuth, clientOptions, req);
-        if (host && port) {
-            return res.status(200).json({ host, port, gottiId, playerIndex, clientId: playerIndex, gameData, areaData });
+        const { proxyId, gottiId, playerIndex, gameData, areaData } = await this.matchMake(gameType, clientAuth, clientOptions, req);
+        if (proxyId) {
+            return res.status(200).json({ proxyId, gottiId, playerIndex, clientId: playerIndex, gameData, areaData });
         }
         else {
             return res.status(500).json('Invalid request');
@@ -208,9 +211,9 @@ class Gate {
             if (!(gameId in this.gamesById))
                 throw `match maker gave gameId: ${gameId} which is not a valid game id.`;
             const connectorData = this.gamesById[gameId].connectorsData[0]; // always sorted;
-            const { host, port, gottiId, playerIndex, joinOptions } = await this.addPlayerToConnector(connectorData.serverIndex, auth, clientJoinOptions);
+            const { proxyId, gottiId, playerIndex, joinOptions } = await this.addPlayerToConnector(connectorData.serverIndex, auth, clientJoinOptions);
             const { gameData, areaData } = this.gamesById[gameId];
-            return { host, port, gottiId, playerIndex, joinOptions, gameData, areaData };
+            return { proxyId, gottiId, playerIndex, joinOptions, gameData, areaData };
         }
         catch (err) {
             throw err;
@@ -288,11 +291,11 @@ class Gate {
     async addPlayerToConnector(serverIndex, auth, clientJoinOptions) {
         const connectorData = this.connectorsByServerIndex[serverIndex];
         try {
-            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, clientJoinOptions);
+            const { proxyId, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, clientJoinOptions);
             connectorData.connectedClients++;
             //sorts
             this.gamesById[connectorData.gameId].connectorsData.sort(Util_1.sortByProperty('connectedClients'));
-            return { host, port, gottiId, playerIndex };
+            return { proxyId, gottiId, playerIndex };
         }
         catch (err) {
             throw err;

@@ -1,4 +1,5 @@
 export interface ConnectorData {
+    proxyId: string;
     host: string;
     port: number;
     serverIndex: number;
@@ -65,6 +66,7 @@ export declare class Gate {
         serverIndex: number;
         host: string;
         port: number;
+        proxyId: any;
     }>, gameType: any, gameId: any, gameData: any, areaData: any): void;
     private addConnector;
     /**

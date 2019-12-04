@@ -8,7 +8,7 @@ const path = require('path');
 const helmet = require('helmet');
 const proxy = require('http-proxy-middleware');
 class Proxy {
-    constructor(authUrl, gateUrl, webUrls, proxyPort = 80) {
+    constructor(authUrl, gateUrl, webUrls, proxyPort = 80, connectorProxies) {
         this.currentWebContentIdx = 0;
         this.currentWebApiIdx = 0;
         this.authUrl = authUrl;
@@ -16,6 +16,10 @@ class Proxy {
         this.webUrls = webUrls;
         this.proxyPort = proxyPort;
         this.app = express();
+        this.connectorProxies = {};
+        connectorProxies.forEach(({ proxyId, host, port }) => {
+            this.connectorProxies[`/${proxyId}`] = `ws://${host}:${port}`;
+        });
     }
     getContentHostRoundRobin() {
         if (this.currentWebContentIdx === this.webUrls.length)
@@ -34,6 +38,15 @@ class Proxy {
         this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.BASE_PUBLIC_API}`, proxy({
             router: this.getApiHostRoundRobin(),
             target: this.webUrls[this.currentWebContentIdx],
+        }));
+        this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.CONNECTOR}`, proxy({
+            ws: true,
+            router: (req) => {
+                console.log('the req.path was', req.path);
+                console.log('the found proxy was', this.connectorProxies[req.path]);
+                return this.connectorProxies[req.path];
+            },
+            target: this.connectorProxies[Object.keys(this.connectorProxies)[0]]
         }));
         this.app.use('/', proxy({
             router: this.getContentHostRoundRobin.bind(this),

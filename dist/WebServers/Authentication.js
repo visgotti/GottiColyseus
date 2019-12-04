@@ -93,7 +93,6 @@ class AuthenticationBase extends Base_1.BaseWebServer {
         });
     }
     getAuth(authId) {
-        console.log('checking if auth', authId, 'is in', this.authMap);
         const auth = this.authMap.get(authId);
         if (auth) {
             return auth.auth;
@@ -195,7 +194,6 @@ class AuthenticationBase extends Base_1.BaseWebServer {
                 });
                 if (authId) {
                     this.addAuthToMap(oldAuthId, authId, auth);
-                    console.log('added to auth map', this.authMap);
                     return res.json({
                         [Protocol_1.GOTTI_GATE_AUTH_ID]: authId,
                         [Protocol_1.GOTTI_AUTH_KEY]: auth,
@@ -217,7 +215,6 @@ class AuthenticationBase extends Base_1.BaseWebServer {
         if (oldAuthId) {
             const auth = this.authMap.get(oldAuthId);
             if (auth) {
-                console.log('remove auth', oldAuthId);
                 clearTimeout(auth.timeout);
                 this.authMap.delete(oldAuthId);
                 return true;
