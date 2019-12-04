@@ -8,7 +8,7 @@ const path = require('path');
 const helmet = require('helmet');
 const proxy = require('http-proxy-middleware');
 class Proxy {
-    constructor(authUrl, gateUrl, webUrls, proxyPort = 80, connectorProxies) {
+    constructor(authUrl, gateUrl, webUrls, proxyPort = 80, connectorProxies, useSSL = false) {
         this.currentWebContentIdx = 0;
         this.currentWebApiIdx = 0;
         this.authUrl = authUrl;
@@ -17,8 +17,9 @@ class Proxy {
         this.proxyPort = proxyPort;
         this.app = express();
         this.connectorProxies = {};
+        const wsProtocol = useSSL ? 'https' : 'http';
         connectorProxies.forEach(({ proxyId, host, port }) => {
-            this.connectorProxies[`/${proxyId}`] = `ws://${host}:${port}`;
+            this.connectorProxies[`${Protocol_1.GOTTI_HTTP_ROUTES.CONNECTOR}/${proxyId}`] = `${wsProtocol}://${host}:${port}`;
         });
     }
     getContentHostRoundRobin() {
@@ -39,21 +40,19 @@ class Proxy {
             router: this.getApiHostRoundRobin(),
             target: this.webUrls[this.currentWebContentIdx],
         }));
-        this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.CONNECTOR}`, proxy({
+        const wsProxy = proxy({
             ws: true,
-            router: (req) => {
-                console.log('the req.path was', req.path);
-                console.log('the found proxy was', this.connectorProxies[req.path]);
-                return this.connectorProxies[req.path];
-            },
+            router: this.connectorProxies,
             target: this.connectorProxies[Object.keys(this.connectorProxies)[0]]
-        }));
+        });
+        this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.CONNECTOR}`, wsProxy);
         this.app.use('/', proxy({
             router: this.getContentHostRoundRobin.bind(this),
             target: this.webUrls[this.currentWebContentIdx],
         }));
         return new Promise((resolve, reject) => {
             this.server = this.app.listen(this.proxyPort, () => {
+                this.server.on('upgrade', wsProxy.upgrade);
                 return resolve(true);
             });
         });

@@ -66,7 +66,7 @@ export declare class Gate {
         serverIndex: number;
         host: string;
         port: number;
-        proxyId: any;
+        proxyId: string;
     }>, gameType: any, gameId: any, gameData: any, areaData: any): void;
     private addConnector;
     /**

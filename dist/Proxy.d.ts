@@ -13,7 +13,7 @@ export declare class Proxy {
     private webUrls;
     private connectorProxies;
     private server;
-    constructor(authUrl: any, gateUrl: any, webUrls: any, proxyPort?: number, connectorProxies?: Array<ConnectorProxy>);
+    constructor(authUrl: any, gateUrl: any, webUrls: any, proxyPort?: number, connectorProxies?: Array<ConnectorProxy>, useSSL?: boolean);
     private getContentHostRoundRobin;
     private getApiHostRoundRobin;
     init(): Promise<{}>;
