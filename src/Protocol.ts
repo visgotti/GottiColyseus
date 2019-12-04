@@ -103,7 +103,8 @@ export const GOTTI_HTTP_ROUTES = {
     BASE_GATE: '/gotti_gate',
     BASE_PUBLIC_API: '/gotti_api',
     GET_GAMES: '/gotti_games',
-    JOIN_GAME: '/gotti_join_game'
+    JOIN_GAME: '/gotti_join_game',
+    CONNECTOR: '/gotti_connector'
 }
 
 export const GOTTI_ROUTE_BODY_PAYLOAD = '__GOTTI_ROUTE_BODY_PAYLOAD__';

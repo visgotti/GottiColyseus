@@ -7,6 +7,8 @@ const path = require('path');
 const helmet = require('helmet');
 const proxy = require('http-proxy-middleware');
 
+type ConnectorProxy = { proxyId: string, host: string, port: number };
+
 export class Proxy {
     private app: any;
     private proxyPort: number;
@@ -15,13 +17,18 @@ export class Proxy {
     private authUrl: string;
     private gateUrl: string;
     private webUrls: Array<string>;
+    private connectorProxies: any;
     private server: any;
-    constructor(authUrl, gateUrl, webUrls, proxyPort=80) {
+    constructor(authUrl, gateUrl, webUrls, proxyPort=80, connectorProxies?: Array<ConnectorProxy>) {
         this.authUrl = authUrl;
         this.gateUrl = gateUrl;
         this.webUrls = webUrls;
         this.proxyPort = proxyPort;
         this.app = express();
+        this.connectorProxies = {};
+        connectorProxies.forEach(({ proxyId, host, port }) => {
+            this.connectorProxies[`/${proxyId}`] = `ws://${host}:${port}`
+        });
     }
 
     private getContentHostRoundRobin() {
@@ -32,7 +39,6 @@ export class Proxy {
         if(this.currentWebApiIdx === this.webUrls.length) this.currentWebApiIdx = 0;
         return this.webUrls[this.currentWebApiIdx++];
     }
-
     public async init() {
         this.app.use(helmet());
         this.app.use(`${GOTTI_HTTP_ROUTES.BASE_AUTH}`, proxy({ target: this.authUrl }));
@@ -40,6 +46,15 @@ export class Proxy {
         this.app.use(`${GOTTI_HTTP_ROUTES.BASE_PUBLIC_API}`, proxy({
             router: this.getApiHostRoundRobin(),
             target: this.webUrls[this.currentWebContentIdx],
+        }));
+        this.app.use(`${GOTTI_HTTP_ROUTES.CONNECTOR}`, proxy({
+            ws: true,
+            router: (req) => {
+                console.log('the req.path was', req.path);
+                console.log('the found proxy was', this.connectorProxies[req.path]);
+                return this.connectorProxies[req.path];
+            },
+            target: this.connectorProxies[Object.keys(this.connectorProxies)[0]]
         }));
         this.app.use('/', proxy({
             router: this.getContentHostRoundRobin.bind(this),
