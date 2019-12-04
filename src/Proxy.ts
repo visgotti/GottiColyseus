@@ -19,18 +19,18 @@ export class Proxy {
     private webUrls: Array<string>;
     private connectorProxies: any;
     private server: any;
-    constructor(authUrl, gateUrl, webUrls, proxyPort=80, connectorProxies?: Array<ConnectorProxy>) {
+    constructor(authUrl, gateUrl, webUrls, proxyPort=80, connectorProxies?: Array<ConnectorProxy>, useSSL=false) {
         this.authUrl = authUrl;
         this.gateUrl = gateUrl;
         this.webUrls = webUrls;
         this.proxyPort = proxyPort;
         this.app = express();
         this.connectorProxies = {};
+        const wsProtocol = useSSL ? 'https' : 'http';
         connectorProxies.forEach(({ proxyId, host, port }) => {
-            this.connectorProxies[`/${proxyId}`] = `ws://${host}:${port}`
+            this.connectorProxies[`${GOTTI_HTTP_ROUTES.CONNECTOR}/${proxyId}`] = `${wsProtocol}://${host}:${port}`;
         });
     }
-
     private getContentHostRoundRobin() {
         if(this.currentWebContentIdx === this.webUrls.length) this.currentWebContentIdx = 0;
         return this.webUrls[this.currentWebContentIdx++];
@@ -47,15 +47,15 @@ export class Proxy {
             router: this.getApiHostRoundRobin(),
             target: this.webUrls[this.currentWebContentIdx],
         }));
-        this.app.use(`${GOTTI_HTTP_ROUTES.CONNECTOR}`, proxy({
+
+        const wsProxy = proxy({
             ws: true,
-            router: (req) => {
-                console.log('the req.path was', req.path);
-                console.log('the found proxy was', this.connectorProxies[req.path]);
-                return this.connectorProxies[req.path];
-            },
+            router: this.connectorProxies,
             target: this.connectorProxies[Object.keys(this.connectorProxies)[0]]
-        }));
+        });
+
+        this.app.use(`${GOTTI_HTTP_ROUTES.CONNECTOR}`, wsProxy);
+
         this.app.use('/', proxy({
             router: this.getContentHostRoundRobin.bind(this),
             target: this.webUrls[this.currentWebContentIdx],
@@ -63,6 +63,7 @@ export class Proxy {
 
         return new Promise((resolve, reject) => {
             this.server = this.app.listen(this.proxyPort, () => {
+                this.server.on('upgrade', wsProxy.upgrade);
                 return resolve(true);
             });
         })

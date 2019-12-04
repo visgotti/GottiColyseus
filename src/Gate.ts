@@ -182,7 +182,7 @@ export class Gate {
     }
 
     // TODO: refactor this and adding games
-    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number, proxyId }>, gameType, gameId, gameData: any, areaData: any) {
+    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number, proxyId: string }>, gameType, gameId, gameData: any, areaData: any) {
 
         if(gameId in this.gamesById) {
             throw `gameId: ${gameId} is being added for a second time. The first reference was ${this.gamesById[gameId]}`
