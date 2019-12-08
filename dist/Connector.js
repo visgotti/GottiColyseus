@@ -108,8 +108,8 @@ class Connector extends events_1.EventEmitter {
         let backChannelURIs = [...this.areaServerURIs];
         let backChannelIds = [...this.areaRoomIds];
         if (this.masterServerURI) {
+            // want to init the subscriber to the master but not a channel..
             backChannelURIs.push(this.masterServerURI);
-            backChannelIds.push(Protocol_1.GOTTI_MASTER_CHANNEL_ID);
         }
         if (this.relayURI) {
             backChannelURIs.push(this.relayURI);
@@ -122,9 +122,6 @@ class Connector extends events_1.EventEmitter {
         this.masterChannel.addChannels(backChannelIds);
         this.channels = this.masterChannel.frontChannels;
         this.relayChannel = this.channels[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
-        if (this.channels[Protocol_1.GOTTI_MASTER_CHANNEL_ID]) {
-            this.masterServerChannel = this.channels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
-        }
         //TODO: right now you need to wait a bit after connecting and binding to uris will refactor channels eventually to fix this
         return new Promise((resolve, reject) => {
             setTimeout(() => {
@@ -133,7 +130,7 @@ class Connector extends events_1.EventEmitter {
                     // connection backChannelOptions were made with area channels in mind.. so
                     // these frameworked channels keys should be deleted if theyre in.
                     delete this.areaData[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
-                    delete this.areaData[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+                    this.registerMasterServerMessages();
                     this.registerChannelMessages();
                     this.server = new WebSocket.Server(this.options);
                     this.server.on('connection', this.onConnection.bind(this));
@@ -230,28 +227,19 @@ class Connector extends events_1.EventEmitter {
             const channelId = keys[i];
             const channel = this.channels[channelId];
             let registerHandler = this.registerAreaMessages.bind(this);
-            // change register handler if the channel id was a specified gotti frameworked channel id
-            if (channelId === Protocol_1.GOTTI_MASTER_CHANNEL_ID) {
-                registerHandler = this.registerMasterServerMessages.bind(this);
-            }
-            else if (channelId === Protocol_1.GOTTI_RELAY_CHANNEL_ID) {
+            if (channelId === Protocol_1.GOTTI_RELAY_CHANNEL_ID) {
                 registerHandler = this.registerRelayMessages.bind(this);
             }
             registerHandler(channel);
         }
     }
     registerMasterServerMessages() {
-        if (this.masterServerChannel) {
-            this.masterServerChannel.onMessage((message) => {
-                if (message[0] === 36 /* MASTER_TO_AREA_BROADCAST */) {
-                    //TODO: the only way to broadcast to all area rooms right now is through an area front channel since the masterServerChannel doesnt know about the areas
-                    // we should probably try and keep the area front channels sorted by clients in them so we can use most optimized one to make the dispatches
-                    this.channels[this.areaRoomIds[0]].broadcast(message, this.areaRoomIds);
-                }
-                else {
-                    this.onMasterMessage && this.onMasterMessage(message);
-                }
+        if (this.masterServerURI) {
+            const handler = this.channels[this.areaRoomIds[0]].broadcast;
+            this.masterChannel.messenger.createSubscription(36 /* MASTER_TO_AREA_BROADCAST */.toString(), 36 /* MASTER_TO_AREA_BROADCAST */.toString(), (message) => {
+                handler(message[0], this.areaRoomIds);
             });
+            this.masterChannel.messenger.createPublish(35 /* AREA_TO_MASTER_MESSAGE */.toString());
         }
     }
     registerRelayMessages(relayChannel) {
@@ -324,7 +312,7 @@ class Connector extends events_1.EventEmitter {
                 areaChannel.broadcast(message, toAreaIds);
             }
             else if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
-                this.masterServerChannel.send([35 /* AREA_TO_MASTER_MESSAGE */, areaChannel.channelId, message[1]]);
+                this.masterChannel.messenger.publications[35 /* AREA_TO_MASTER_MESSAGE */.toString()]([areaChannel.channelId, message[1]]);
             }
         });
     }

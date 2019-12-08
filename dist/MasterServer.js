@@ -1,30 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const dist_1 = require("gotti-channels/dist");
+const gotti_pubsub_1 = require("gotti-pubsub");
 const Protocol_1 = require("./Protocol");
 class MasterServer {
     constructor(options) {
         this.connectorsByServerIndex = {};
-        this.masterChannel = null;
-        this.channel = null;
-        this.masterChannel = new dist_1.BackMaster(Protocol_1.GOTTI_MASTER_SERVER_INDEX);
-        this.masterChannel.initialize(options.masterURI, options.connectorURIs);
-        this.masterChannel.addChannels([Protocol_1.GOTTI_MASTER_CHANNEL_ID]);
-        this.channel = this.masterChannel.backChannels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
-        this.masterChannel.messenger.createPublish(37 /* GLOBAL_MASTER_MESSAGE */.toString());
-        this.dispatchGlobal = this.masterChannel.messenger.publications[37 /* GLOBAL_MASTER_MESSAGE */.toString()];
-        this.channel.onMessage((message) => {
-            if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
-                this.onAreaMessage(message[1], message[2]);
-            }
+        this.pubsub = new gotti_pubsub_1.Messenger(Protocol_1.GOTTI_MASTER_CHANNEL_ID);
+        this.pubsub.initializePublisher(options.masterURI);
+        this.pubsub.initializeSubscriber(options.connectorURIs);
+        this.pubsub.createPublish(36 /* MASTER_TO_AREA_BROADCAST */.toString());
+        this.dispatchToAreas = this.pubsub.publications[36 /* MASTER_TO_AREA_BROADCAST */.toString()];
+        this.pubsub.createSubscription(35 /* AREA_TO_MASTER_MESSAGE */.toString(), 35 /* AREA_TO_MASTER_MESSAGE */.toString(), (data) => {
+            this.onAreaMessage(data[0], data[1]);
         });
-    }
-    /**
-     * sends message to an area that can be handled in any systems onMasterMessage
-     * @param message
-     */
-    dispatchToAreas(message) {
-        this.channel.broadcast([36 /* MASTER_TO_AREA_BROADCAST */, message]);
+        this.pubsub.createPublish(37 /* GLOBAL_MASTER_MESSAGE */.toString());
+        // @ts-ignore
+        this.dispatchGlobal = this.pubsub.publications[37 /* GLOBAL_MASTER_MESSAGE */.toString()];
     }
     initializeGracefulShutdown() {
         //todo send messages to connector servers to let it know gate is down?

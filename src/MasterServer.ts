@@ -1,5 +1,5 @@
 import { Messenger as Requester, Broker } from 'gotti-reqres/dist';
-import {BackChannel, BackMaster} from "gotti-channels/dist";
+import { Messenger } from "gotti-pubsub";
 import { GateProtocol, Protocol, GOTTI_MASTER_CHANNEL_ID, GOTTI_MASTER_SERVER_INDEX } from './Protocol';
 import { sortByProperty, generateId } from './Util';
 import {ConnectorClient as Client} from "./ConnectorClient";
@@ -17,33 +17,25 @@ export interface MasterConfig {
 
 export abstract class MasterServer {
     private connectorsByServerIndex: { [serverIndex: number]: ConnectorData } = {};
-    private masterChannel: BackMaster = null;
-    private channel: BackChannel = null;
     public dispatchGlobal: (data) => void;
-
+    private pubsub: Messenger;
+    private dispatchToAreas: Function;
     constructor(options: MasterConfig) {
-        this.masterChannel = new BackMaster(GOTTI_MASTER_SERVER_INDEX);
-        this.masterChannel.initialize(options.masterURI, options.connectorURIs);
-        this.masterChannel.addChannels([GOTTI_MASTER_CHANNEL_ID]);
-        this.channel = this.masterChannel.backChannels[GOTTI_MASTER_CHANNEL_ID];
+        this.pubsub = new Messenger(GOTTI_MASTER_CHANNEL_ID);
+        this.pubsub.initializePublisher(options.masterURI);
+        this.pubsub.initializeSubscriber(options.connectorURIs);
 
-        this.masterChannel.messenger.createPublish(Protocol.GLOBAL_MASTER_MESSAGE.toString());
+        this.pubsub.createPublish(Protocol.MASTER_TO_AREA_BROADCAST.toString());
+        this.dispatchToAreas = this.pubsub.publications[Protocol.MASTER_TO_AREA_BROADCAST.toString()];
 
-        this.dispatchGlobal = this.masterChannel.messenger.publications[Protocol.GLOBAL_MASTER_MESSAGE.toString()];
-        this.channel.onMessage((message) => {
-            if(message[0] === Protocol.AREA_TO_MASTER_MESSAGE) {
-                this.onAreaMessage(message[1], message[2]);
-            }
+        this.pubsub.createSubscription(Protocol.AREA_TO_MASTER_MESSAGE.toString(), Protocol.AREA_TO_MASTER_MESSAGE.toString(), (data) => {
+            this.onAreaMessage(data[0], data[1]);
         });
+        this.pubsub.createPublish(Protocol.GLOBAL_MASTER_MESSAGE.toString());
+        // @ts-ignore
+        this.dispatchGlobal = this.pubsub.publications[Protocol.GLOBAL_MASTER_MESSAGE.toString()];
     }
 
-    /**
-     * sends message to an area that can be handled in any systems onMasterMessage
-     * @param message
-     */
-    public dispatchToAreas(message: any){
-        this.channel.broadcast([Protocol.MASTER_TO_AREA_BROADCAST, message])
-    }
 
     private initializeGracefulShutdown() {
         //todo send messages to connector servers to let it know gate is down?
