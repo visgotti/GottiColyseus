@@ -34,16 +34,16 @@ class AreaRoom extends events_1.EventEmitter {
         this.startGottiProcess();
     }
     startGottiProcess() {
-        this.gottiProcess.addRoom(this);
         this.gottiProcess.clientManager.setClientWrite = (clientId, areaId, options) => {
             this.masterChannel.messageClient(clientId, [21 /* SET_CLIENT_AREA_WRITE */, areaId, options]);
         };
         this.gottiProcess.clientManager.removeClientListener = (clientId, options) => {
             this.masterChannel.messageClient(clientId, [23 /* REMOVE_CLIENT_AREA_LISTEN */, this.areaId, options]);
         };
-        this.gottiProcess.clientManager.setClientListen = (clientId, areaId, options) => {
+        this.gottiProcess.clientManager.addClientListener = (clientId, areaId, options) => {
             this.masterChannel.messageClient(clientId, [22 /* ADD_CLIENT_AREA_LISTEN */, areaId, options]);
         };
+        this.gottiProcess.addRoom(this);
         this.gottiProcess.startAllSystems();
         this.gottiProcess.startLoop();
     }
