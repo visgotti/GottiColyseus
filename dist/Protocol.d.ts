@@ -23,6 +23,7 @@ export declare const enum Protocol {
     AREA_TO_AREA_SYSTEM_MESSAGE = 34,
     AREA_TO_MASTER_MESSAGE = 35,
     MASTER_TO_AREA_BROADCAST = 36,
+    GLOBAL_MASTER_MESSAGE = 37,
     BAD_REQUEST = 50,
     CLIENT_WEB_RTC_ENABLED = 100,
     ENABLED_CLIENT_P2P_SUCCESS = 101,
@@ -53,12 +54,29 @@ export declare const enum Protocol {
 }
 export declare const enum GateProtocol {
     RESERVE_PLAYER_SEAT = "1",
-    HEARTBEAT = "2"
+    HEARTBEAT = "2",
+    RESERVE_AUTHENTICATION = "3",
+    GET_AUTHENTICATION = "4",
+    UPDATE_AUTHENTICATION = "5"
 }
 export declare enum StateProtocol {
     SET = 0,
     PATCH = 1
 }
+export declare const GOTTI_HTTP_ROUTES: {
+    BASE_AUTH: string;
+    AUTHENTICATE: string;
+    REGISTER: string;
+    BASE_GATE: string;
+    BASE_PUBLIC_API: string;
+    GET_GAMES: string;
+    JOIN_GAME: string;
+    CONNECTOR: string;
+};
+export declare const GOTTI_ROUTE_BODY_PAYLOAD = "__GOTTI_ROUTE_BODY_PAYLOAD__";
+export declare const GOTTI_GET_GAMES_OPTIONS = "__GOTTI_GET_GAMES_OPTIONS__";
+export declare const GOTTI_AUTH_KEY = "__GOTTI_AUTH_KEY__";
+export declare const GOTTI_GATE_AUTH_ID = "__GOTTI_AUTH_ID__";
 export declare const GOTTI_GATE_CHANNEL_PREFIX = "__GOTTI_GATE_CHANNEL__";
 export declare const GOTTI_MASTER_CHANNEL_ID = "__GOTTI_MASTER_CHANNEL__";
 export declare const GOTTI_MASTER_SERVER_INDEX = 55555;

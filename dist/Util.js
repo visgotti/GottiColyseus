@@ -11,6 +11,11 @@ function registerGracefulShutdown(callback) {
     signals.forEach((signal) => process.once(signal, () => callback(signal)));
 }
 exports.registerGracefulShutdown = registerGracefulShutdown;
+function httpErrorHandler(res, err, code = 500) {
+    err = (typeof err === 'object' && err.message) ? err.message : err;
+    return res.status(code).json(err);
+}
+exports.httpErrorHandler = httpErrorHandler;
 function retry(cb, maxRetries = 3, retries = 0, errorWhiteList = []) {
     return new Promise((resolve, reject) => {
         cb()
@@ -61,7 +66,9 @@ function parseQueryString(query) {
     return data;
 }
 exports.parseQueryString = parseQueryString;
-function generateId() { return nanoid(9); }
+function generateId(len = 9) {
+    return nanoid(len);
+}
 exports.generateId = generateId;
 function merge(a, ...objs) {
     for (let i = 0, len = objs.length; i < len; i++) {

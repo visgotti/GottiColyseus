@@ -29,6 +29,7 @@ const DEFAULT_RELAY_RATE = 1000 / 30; // 30fpS
 class Connector extends events_1.EventEmitter {
     constructor(options) {
         super();
+        this.gameData = {};
         this.maxClients = Infinity;
         this.patchRate = DEFAULT_PATCH_RATE;
         this.autoDispose = true;
@@ -50,7 +51,7 @@ class Connector extends events_1.EventEmitter {
                 client.p2p_capable = query.isWebRTCSupported;
                 client.gottiId = req.gottiId;
                 client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
-                this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].seatOptions);
+                this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].joinOptions);
             }
             // prevent server crashes if a single client had unexpected error
             client.on('error', (err) => console.error(err.message + '\n' + err.stack));
@@ -67,6 +68,9 @@ class Connector extends events_1.EventEmitter {
         this.port = options.port | 8080;
         this.options = options;
         this.options.port = this.port;
+        if (this.options.gameData) {
+            this.gameData = this.options.gameData;
+        }
         if (options.server === 'http') {
             this.httpServer = http.createServer();
             this.options.server = this.httpServer;
@@ -125,11 +129,11 @@ class Connector extends events_1.EventEmitter {
         return new Promise((resolve, reject) => {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
-                    this.areaOptions = connection.backChannelOptions;
+                    this.areaData = connection.backChannelOptions;
                     // connection backChannelOptions were made with area channels in mind.. so
                     // these frameworked channels keys should be deleted if theyre in.
-                    delete this.areaOptions[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
-                    delete this.areaOptions[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+                    delete this.areaData[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
+                    delete this.areaData[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
                     this.registerChannelMessages();
                     this.server = new WebSocket.Server(this.options);
                     this.server.on('connection', this.onConnection.bind(this));
@@ -142,12 +146,22 @@ class Connector extends events_1.EventEmitter {
     }
     /**
      * @param auth - authentication data sent from Gate server.
-     * @param seatOptions - additional options that may have sent from gate server, you can add/remove properties
+     * @param joinOptions - additional options that may have sent from gate server, you can add/remove properties
      * to it in request join and it will persist onto the client object.
      * @returns {number}
      */
-    requestJoin(auth, seatOptions) {
+    requestJoin(auth, joinOptions) {
         return 1;
+    }
+    getClientDataByGottiId(gottiId) {
+        const client = this.clientsById[gottiId];
+        if (client) {
+            return {
+                auth: client.auth,
+                joinOptions: client.joinOptions,
+            };
+        }
+        return null;
     }
     async disconnect(closeHttp = true) {
         this.stopMessageRelay();
@@ -266,7 +280,6 @@ class Connector extends events_1.EventEmitter {
             else if (protocol === 113 /* SIGNAL_FAILED */) {
                 // [protocol, fromPlayerIndex, toPlayerGottiId, options])
                 const toClient = this.clientsById[message[2]];
-                console.log('GOT FAILED PEER CONNECTION REQUEST BACK FROM RELAY');
                 if (toClient) {
                     // [protocol, fromPlayerIndex, options?]
                     Protocol_1.send(toClient, [protocol, message[1], message[2]]);
@@ -275,7 +288,6 @@ class Connector extends events_1.EventEmitter {
             else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
                 //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, systemName, requestOptions, toPlayerrGottiId], toPlayerData.connectorId)
                 const toClient = this.clientsById[message[5]];
-                console.log('GOT PEER CONNECTION REQUEST BACK FROM RELAY');
                 if (toClient) {
                     // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
                     Protocol_1.send(toClient, [protocol, message[1], message[2], message[3], message[4]]);
@@ -317,7 +329,14 @@ class Connector extends events_1.EventEmitter {
         });
     }
     async _getInitialWriteArea(client, clientOptions) {
-        const write = this.getInitialWriteArea(client, this.areaOptions, clientOptions);
+        const oldAreaId = client.channelClient.processorChannel;
+        if (oldAreaId) {
+            Protocol_1.send(client, 24 /* WRITE_AREA_ERROR */);
+            return false;
+        }
+        console.log('running get initialWriteArea');
+        const write = this.getInitialWriteArea(client, this.areaData, clientOptions);
+        console.log('write area id was', write.areaId);
         if (write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);
@@ -408,7 +427,6 @@ class Connector extends events_1.EventEmitter {
      * @returns {boolean}
      */
     async changeAreaWrite(client, newAreaId, writeOptions) {
-        const oldAreaId = client.channelClient.processorChannel;
         let isLinked = client.channelClient.isLinkedToChannel(newAreaId);
         if (!(isLinked)) {
             isLinked = await this.addAreaListen(client, newAreaId, writeOptions);
@@ -429,7 +447,7 @@ class Connector extends events_1.EventEmitter {
         client.channelClient.unlinkChannel(areaId);
         Protocol_1.send(client, [23 /* REMOVE_CLIENT_AREA_LISTEN */, areaId, options]);
     }
-    _onJoin(client, auth, seatOptions) {
+    _onJoin(client, auth, joinOptions) {
         // clear the timeout and remove the reserved seat since player joined
         clearTimeout(this.reservedSeats[client.gottiId].timeout);
         delete this.reservedSeats[client.gottiId];
@@ -440,14 +458,12 @@ class Connector extends events_1.EventEmitter {
         this.clients.push(client);
         this.clientsById[client.gottiId] = client;
         client.auth = auth;
-        client.seatOptions = seatOptions;
-        let joinOptions = null;
+        client.joinOptions = joinOptions;
         if (this.onJoin) {
-            joinOptions = this.onJoin(client);
+            client.joinedOptions = this.onJoin(client, this.changeAreaWrite.bind(this, client));
         }
         client.auth = auth;
-        client.seatOptions = seatOptions;
-        Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, this.areaOptions, joinOptions]);
+        Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, client.joinedOptions]);
         if (this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
             this.relayChannel.send([10 /* JOIN_CONNECTOR */, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid]);
         }
@@ -476,14 +492,14 @@ class Connector extends events_1.EventEmitter {
      * reserves seat till player joins
      * @param clientId - id of player to reserve seat for
      * @param auth - data player authenticated with on gate.
-     * @param seatOptions - additional data sent from the gate
+     * @param joinOptions - additional data sent from the gate
      * @private
      */
-    _reserveSeat(clientId, playerIndex, auth, seatOptions) {
+    _reserveSeat(clientId, playerIndex, auth, joinOptions) {
         this.reservedSeats[clientId] = {
             auth,
             playerIndex,
-            seatOptions,
+            joinOptions,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
             }, 10000) // reserve seat for 10 seconds
@@ -498,10 +514,10 @@ class Connector extends events_1.EventEmitter {
     _requestJoin(data) {
         const playerIndex = data.playerIndex;
         const auth = data && data.auth ? data.auth : {};
-        const seatOptions = data && data.seatOptions ? data.seatOptions : {};
-        if (this.requestJoin(auth, seatOptions)) {
+        const joinOptions = data && data.joinOptions ? data.joinOptions : {};
+        if (this.requestJoin(auth, joinOptions)) {
             const gottiId = Util_1.generateId();
-            this._reserveSeat(gottiId, playerIndex, auth, seatOptions);
+            this._reserveSeat(gottiId, playerIndex, auth, joinOptions);
             // todo send host n port
             return { gottiId };
         }

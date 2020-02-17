@@ -40,6 +40,7 @@ export const enum Protocol {
     AREA_TO_AREA_SYSTEM_MESSAGE = 34,
     AREA_TO_MASTER_MESSAGE = 35,
     MASTER_TO_AREA_BROADCAST = 36,
+    GLOBAL_MASTER_MESSAGE = 37,
         // Generic messages (50~60)
     BAD_REQUEST = 50,
 
@@ -85,12 +86,31 @@ export const enum GateProtocol {
     // Gate Communication 61-70
     RESERVE_PLAYER_SEAT = '1',
     HEARTBEAT = '2',
+    RESERVE_AUTHENTICATION = '3',
+    GET_AUTHENTICATION = '4',
+    UPDATE_AUTHENTICATION = '5',
 }
 
 export enum StateProtocol {
     SET = 0,
     PATCH = 1
 }
+
+export const GOTTI_HTTP_ROUTES = {
+    BASE_AUTH: '/gotti_auth',
+    AUTHENTICATE: '/gotti_authenticate',
+    REGISTER: '/gotti_register',
+    BASE_GATE: '/gotti_gate',
+    BASE_PUBLIC_API: '/gotti_api',
+    GET_GAMES: '/gotti_games',
+    JOIN_GAME: '/gotti_join_game',
+    CONNECTOR: '/gotti_connector'
+}
+
+export const GOTTI_ROUTE_BODY_PAYLOAD = '__GOTTI_ROUTE_BODY_PAYLOAD__';
+export const GOTTI_GET_GAMES_OPTIONS = '__GOTTI_GET_GAMES_OPTIONS__';
+export const GOTTI_AUTH_KEY = '__GOTTI_AUTH_KEY__';
+export const GOTTI_GATE_AUTH_ID = '__GOTTI_AUTH_ID__';
 
 export const GOTTI_GATE_CHANNEL_PREFIX = '__GOTTI_GATE_CHANNEL__';
 

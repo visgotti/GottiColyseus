@@ -11,6 +11,8 @@ class MasterServer {
         this.masterChannel.initialize(options.masterURI, options.connectorURIs);
         this.masterChannel.addChannels([Protocol_1.GOTTI_MASTER_CHANNEL_ID]);
         this.channel = this.masterChannel.backChannels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
+        this.masterChannel.messenger.createPublish(37 /* GLOBAL_MASTER_MESSAGE */.toString());
+        this.dispatchGlobal = this.masterChannel.messenger.publications[37 /* GLOBAL_MASTER_MESSAGE */.toString()];
         this.channel.onMessage((message) => {
             if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
                 this.onAreaMessage(message[1], message[2]);

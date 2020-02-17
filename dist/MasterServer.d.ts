@@ -12,6 +12,7 @@ export declare abstract class MasterServer {
     private connectorsByServerIndex;
     private masterChannel;
     private channel;
+    dispatchGlobal: (data: any) => void;
     constructor(options: MasterConfig);
     /**
      * sends message to an area that can be handled in any systems onMasterMessage

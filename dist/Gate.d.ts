@@ -1,4 +1,5 @@
 export interface ConnectorData {
+    proxyId: string;
     host: string;
     port: number;
     serverIndex: number;
@@ -14,7 +15,7 @@ export interface ConnectorData {
  */
 export declare type MatchMakerFunction = (availableGames: any, auth: any, clientOptions?: any) => {
     gameId: string;
-    seatOptions: any;
+    joinOptions: any;
 };
 export interface GameData {
     connectorsData: Array<ConnectorData>;
@@ -23,6 +24,8 @@ export interface GameData {
     region?: string;
     publicOptions?: any;
     options?: any;
+    gameData?: any;
+    areaData?: any;
 }
 export interface GateConfig {
     gateURI: string;
@@ -31,20 +34,30 @@ export interface GateConfig {
 export declare type ClientConnectorLookup = Map<string, number>;
 export declare class Gate {
     urls: any[];
+    private _authenticationHandler;
     private connectorsByServerIndex;
     private connectedClients;
     private pendingClients;
     private gamesById;
     private requestBroker;
     private requester;
+    private responder;
+    readonly redisURI: string;
     private availableGamesByType;
     private unavailableGamesById;
     private matchMakersByGameType;
     private playerIndex;
+    private authMap;
     private heartbeat;
+    private authTimeout;
     private makeGameAvailable;
     private makeGameUnavailable;
-    constructor(gateURI: any);
+    private _publicGateData;
+    private publicGateDataChanged;
+    constructor(gateURI: any, redisURI?: any);
+    getPlayerAuth(authId: any): Promise<any>;
+    onAuthentication(onAuthHandler: any): void;
+    authenticationHandler(req: any, res: any): void;
     defineMatchMaker(gameType: any, MatchMakerFunction: any): void;
     private createHeartbeatForConnector;
     private createReserveSeatForConnector;
@@ -53,7 +66,8 @@ export declare class Gate {
         serverIndex: number;
         host: string;
         port: number;
-    }>, gameType: any, gameId: any, publicOptions?: any): void;
+        proxyId: string;
+    }>, gameType: any, gameId: any, gameData: any, areaData: any): void;
     private addConnector;
     /**
      * Handles the request from a player for a certain game type. needs work
@@ -68,12 +82,13 @@ export declare class Gate {
      *
      * @param gameType - type of game requested
      * @param auth - user authentication data
-     * @param clientOptions - additional data about game request sent from client
+     * @param clientJoinOptions - additional data about game request sent from client
      * @returns {{host, port, gottiId}}
      */
     private matchMake;
-    private getPublicGateData;
-    gateKeep(req: any, res: any): void;
+    readonly publicGateData: any;
+    private makePublicGateData;
+    gateKeep(req: any, res: any): Promise<any>;
     registerGateKeep(handler: (request: any, response: any) => any): void;
     private onGateKeepHandler;
     private validateGameRequest;
@@ -82,7 +97,7 @@ export declare class Gate {
      *
      * @param serverIndex
      * @param auth
-     * @param seatOptions
+     * @param joinOptions
      * @returns {{host, port, gottiId, playerIndex }}
      */
     private addPlayerToConnector;
@@ -95,6 +110,9 @@ export declare class Gate {
     stopConnectorHeartbeat(): void;
     private handleHeartbeatError;
     private handleHeartbeatResponse;
+    private registerAuthResponders;
+    getConnectorsByGameId(gameId: any): ConnectorData[];
+    getAuths(ids?: any): {};
     private getClientCountOnConnector;
     private getGameIdOfConnector;
     private disconnect;

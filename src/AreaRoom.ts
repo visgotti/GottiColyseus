@@ -59,8 +59,6 @@ export class AreaRoom extends EventEmitter {
 
     public initializeAndStart(masterChannel, areaChannel) {
         if(this.areaId !== areaChannel.channelId) {
-            console.log('the area channel was', areaChannel.channelId);
-            console.log('the area id was', this.areaId);
             throw 'Area Id and area channel id must be the same.'
         }
         this.areaChannel = areaChannel;
@@ -70,19 +68,16 @@ export class AreaRoom extends EventEmitter {
     }
 
     private startGottiProcess() {
-        this.gottiProcess.addRoom(this);
-
         this.gottiProcess.clientManager.setClientWrite = (clientId, areaId, options?) => {
             this.masterChannel.messageClient(clientId, [Protocol.SET_CLIENT_AREA_WRITE, areaId, options]);
         };
-
         this.gottiProcess.clientManager.removeClientListener = (clientId, options?) => {
             this.masterChannel.messageClient(clientId, [Protocol.REMOVE_CLIENT_AREA_LISTEN, this.areaId, options]);
         };
-
-        this.gottiProcess.clientManager.setClientListen = (clientId, areaId, options?) => {
+        this.gottiProcess.clientManager.addClientListener = (clientId, areaId, options?) => {
             this.masterChannel.messageClient(clientId, [Protocol.ADD_CLIENT_AREA_LISTEN, areaId, options]);
         };
+        this.gottiProcess.addRoom(this);
 
         this.gottiProcess.startAllSystems();
         this.gottiProcess.startLoop();

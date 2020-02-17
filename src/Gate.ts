@@ -1,8 +1,9 @@
-import { Messenger as Requester, Broker } from 'gotti-reqres/dist';
-import { GateProtocol, GOTTI_GATE_CHANNEL_PREFIX } from './Protocol';
+import { Messenger, Broker } from 'gotti-reqres/dist';
+import { GateProtocol, GOTTI_GATE_CHANNEL_PREFIX, GOTTI_GET_GAMES_OPTIONS, GOTTI_GATE_AUTH_ID } from './Protocol';
 import { sortByProperty, generateId } from './Util';
 
 export interface ConnectorData {
+    proxyId: string,
     host: string,
     port: number,
     serverIndex: number,
@@ -17,7 +18,7 @@ export interface ConnectorData {
  * @param auth - user authentication data
  * @param clientOptions - additional options client may have passed in game request
  */
-export type MatchMakerFunction = (availableGames: any, auth: any, clientOptions?: any) => { gameId: string, seatOptions: any };
+export type MatchMakerFunction = (availableGames: any, auth: any, clientOptions?: any) => { gameId: string, joinOptions: any };
 
 export interface GameData {
     connectorsData: Array<ConnectorData>;
@@ -26,6 +27,8 @@ export interface GameData {
     region?: string,
     publicOptions?: any,
     options?: any,
+    gameData?: any,
+    areaData?: any,
 }
 
 export interface GateConfig {
@@ -37,6 +40,9 @@ export type ClientConnectorLookup = Map<string, number>;
 
 export class Gate {
     public urls = [];
+
+    private _authenticationHandler: Function;
+
     private connectorsByServerIndex: { [serverIndex: number]: ConnectorData } = {};
 
     // used for reconnections
@@ -46,7 +52,10 @@ export class Gate {
     private gamesById: { [id: string]: GameData} = {};
 
     private requestBroker: Broker;
-    private requester: Requester;
+    private requester: Messenger;
+    private responder: Messenger;
+
+    readonly redisURI: string;
 
     private availableGamesByType: { [type: string]: {[id: string]: GameData } } = {};
     private unavailableGamesById: { [id: string]: GameData } = {};
@@ -54,12 +63,17 @@ export class Gate {
 
     private playerIndex: number = 0;
 
+    private authMap: Map<string, any> = new Map();
+
     private heartbeat: NodeJS.Timer = null;
+
+    private authTimeout: number = 1000 * 60 * 60 * 12; // 12 hours
 
     private makeGameAvailable(gameId: string) : boolean {
         if(gameId in this.unavailableGamesById) {
             const gameData = this.unavailableGamesById[gameId];
             this.availableGamesByType[gameData.type][gameId] = gameData;
+            this.publicGateDataChanged = true;
             delete this.unavailableGamesById[gameId];
             return true;
         }
@@ -70,22 +84,49 @@ export class Gate {
         if(gameData && this.availableGamesByType[gameData.type] && this.availableGamesByType[gameData.type][gameId]) {
             this.unavailableGamesById[gameId] = gameData;
             delete this.availableGamesByType[gameData.type][gameId];
+            this.publicGateDataChanged = true;
             return true;
         }
         return false;
     }
 
-    constructor(gateURI) {
+    private _publicGateData: any = {};
+    private publicGateDataChanged = true;
+
+    constructor(gateURI, redisURI?) {
         this.gateKeep = this.gateKeep.bind(this);
         this.gameRequested = this.gameRequested.bind(this);
         this.requestBroker = new Broker(gateURI, 'gate');
 
-        this.requester = new Requester({
+        this.requester = new Messenger({
             id: 'gate_requester',
             brokerURI: gateURI,
             request: { timeout: 1000 }
         });
+
+        this.responder = new Messenger({
+            id: 'gate_responder',
+            brokerURI: gateURI,
+            response: true
+        })
+
+        this.registerAuthResponders();
+
         //TODO: initialize subscriber socket
+    }
+
+    public async getPlayerAuth(authId) {
+        const auth = this.authMap.get(authId);
+        if(auth) return auth.auth;
+        return null;
+    }
+
+    public onAuthentication(onAuthHandler) {
+        this._authenticationHandler = onAuthHandler.bind(this);
+    }
+
+    public authenticationHandler(req, res) {
+
     }
 
     public defineMatchMaker(gameType, MatchMakerFunction) {
@@ -107,7 +148,7 @@ export class Gate {
         return this.requester.requests[reqName].bind(this);
     }
 
-    private async reserveSeat(connectorServerIndex, auth, seatOptions): Promise<any> {
+    private async reserveSeat(connectorServerIndex, auth, clientJoinOptions): Promise<any> {
         const tempId = generateId();
 
         this.playerIndex++;
@@ -119,32 +160,29 @@ export class Gate {
         try {
             this.pendingClients[tempId] = auth;
 
-            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, seatOptions });
-            console.log('the result was', result);
+            let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, joinOptions: clientJoinOptions });
+
             if(result && result.gottiId) {
                 this.pendingClients.delete(tempId);
                 this.connectedClients.set(result.gottiId, connectorServerIndex);
-                const { host, port } = this.connectorsByServerIndex[connectorServerIndex];
+                const { proxyId } = this.connectorsByServerIndex[connectorServerIndex];
                 return {
                     gottiId: result.gottiId,
                     playerIndex,
-                    host,
-                    port,
+                    proxyId
                 }
             } else {
                 this.pendingClients.delete(tempId);
                 throw new Error('Invalid response from connector room. Failed to connect.');
             }
-
         } catch(err) {
-            console.log('error was', err);
             this.pendingClients.delete(tempId);
             throw err;
         }
     }
 
     // TODO: refactor this and adding games
-    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number }>, gameType, gameId, publicOptions?: any) {
+    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number, proxyId: string }>, gameType, gameId, gameData: any, areaData: any) {
 
         if(gameId in this.gamesById) {
             throw `gameId: ${gameId} is being added for a second time. The first reference was ${this.gamesById[gameId]}`
@@ -153,25 +191,26 @@ export class Gate {
         const gameConnectorsData = [];
 
         connectorsData.forEach((data) => {
-            const { serverIndex, host, port } = data;
-            gameConnectorsData.push(this.addConnector(host, port, serverIndex, gameId));
+            const { serverIndex, host, port, proxyId } = data;
+            gameConnectorsData.push(this.addConnector(host, port, serverIndex, gameId, proxyId));
         });
 
         this.gamesById[gameId] = {
             id: gameId,
             type: gameType,
             connectorsData: gameConnectorsData,
-            publicOptions,
+            areaData,
+            gameData
         };
 
         if(!(gameType in this.availableGamesByType)) {
             this.availableGamesByType[gameType] = {};
         }
         this.availableGamesByType[gameType][gameId] = this.gamesById[gameId];
+        this.publicGateDataChanged = true;
     }
 
-
-    private addConnector(host, port, serverIndex, gameId) : ConnectorData {
+    private addConnector(host, port, serverIndex, gameId, proxyId) : ConnectorData {
 
         const formatError = () => { return `error when adding connector SERVER_INDEX#: ${serverIndex}, host: ${host}, port: ${port} game ID:${gameId}`; };
 
@@ -183,9 +222,13 @@ export class Gate {
             if(this.connectorsByServerIndex[serverIndex].host === host && this.connectorsByServerIndex[serverIndex].port === port) {
                 throw new Error(`${formatError()} because another connector already has the host and port`);
             }
+            if(this.connectorsByServerIndex[serverIndex].proxyId === proxyId) {
+                throw new Error(`${formatError()} because another connector already has the proxy id ${proxyId}`);
+            }
         }
 
         this.connectorsByServerIndex[serverIndex] = {
+            proxyId,
             host,
             port,
             serverIndex,
@@ -198,8 +241,6 @@ export class Gate {
         return this.connectorsByServerIndex[serverIndex];
     }
 
-
-
     /**
      * Handles the request from a player for a certain game type. needs work
      * right now the reuest has gameId and then the gate server will
@@ -209,22 +250,28 @@ export class Gate {
      * @returns {Response|undefined}
      */
     public async gameRequested(req, res) {
-        if(!(req.auth)) {
-            return res.status(500).json({ error: 'unauthenticated' });
+        const authId = req.body[GOTTI_GATE_AUTH_ID];
+        if(!authId) {
+            return res.status(401).json({ error: 'Error with authentication' });
         }
+        const clientAuth = await this.getPlayerAuth(authId);
 
+        if(!clientAuth) {
+            return res.status(401).json({ error: 'Error with authentication' });
+        }
+        const clientOptions = req.body[GOTTI_GET_GAMES_OPTIONS];
         const validated = this.validateGameRequest(req);
 
         if(validated.error) {
             return res.status(validated.code).json(validated.error);
         }
 
-        const { auth, options, gameType } = validated;
+        const { gameType } = validated;
 
-        const { host, port, gottiId, playerIndex } = await this.matchMake(gameType, auth, options);
+        const { proxyId, gottiId, playerIndex, gameData, areaData } = await this.matchMake(gameType, clientAuth, clientOptions, req);
 
-        if(host && port) {
-            return res.status(200).json({ host, port, gottiId, playerIndex });
+        if(proxyId) {
+            return res.status(200).json({ proxyId, gottiId, playerIndex, clientId: playerIndex, gameData, areaData });
         } else {
             return res.status(500).json('Invalid request');
         }
@@ -234,10 +281,10 @@ export class Gate {
      *
      * @param gameType - type of game requested
      * @param auth - user authentication data
-     * @param clientOptions - additional data about game request sent from client
+     * @param clientJoinOptions - additional data about game request sent from client
      * @returns {{host, port, gottiId}}
      */
-    private async matchMake(gameType, auth?, clientOptions?) : Promise<any> {
+    private async matchMake(gameType, auth, clientJoinOptions, req) : Promise<any> {
         try {
             const definedMatchMaker = this.matchMakersByGameType.get(gameType);
 
@@ -247,24 +294,29 @@ export class Gate {
 
             const availableGames = this.availableGamesByType[gameType];
 
-            const { gameId, seatOptions } = definedMatchMaker(availableGames, auth, clientOptions);
-
-            if(!(gameId in this.gamesById)) {
-                throw `match maker gave gameId: ${gameId} which is not a valid game id.`;
-            }
+            const gameId = definedMatchMaker(availableGames, auth, clientJoinOptions, req);
+            if(!gameId) throw 'Failed to find game.';
+            if(!(gameId in this.gamesById)) throw `match maker gave gameId: ${gameId} which is not a valid game id.`;
 
             const connectorData = this.gamesById[gameId].connectorsData[0]; // always sorted;
 
-            console.log('the connector data was', connectorData);
-
-            const { host, port, gottiId, playerIndex } = await this.addPlayerToConnector(connectorData.serverIndex, auth, seatOptions);
-            return { host, port, gottiId, playerIndex };
+            const { proxyId, gottiId, playerIndex, joinOptions } = await this.addPlayerToConnector(connectorData.serverIndex, auth, clientJoinOptions);
+            const { gameData, areaData } = this.gamesById[gameId];
+            return { proxyId, gottiId, playerIndex, joinOptions, gameData, areaData  };
         } catch (err) {
             throw err;
         }
     }
 
-    private getPublicGateData() {
+    get publicGateData() {
+        if(this.publicGateDataChanged) {
+            this._publicGateData = this.makePublicGateData();
+            this.publicGateDataChanged = false;
+        }
+        return this._publicGateData;
+    }
+
+    private makePublicGateData() {
         let availableData = {};
         for(let key in this.availableGamesByType) {
             availableData[key] = {};
@@ -278,11 +330,25 @@ export class Gate {
     }
 
     public async gateKeep(req, res) {
-        const authed = await Promise.resolve(this.onGateKeepHandler(req, res));
-        if(authed) {
-            return res.status(200).json({ games: this.getPublicGateData() })
-        } else {
-            return res.status(401).json('Error authenticating');
+        const clientOptions = req.body[GOTTI_GET_GAMES_OPTIONS];
+        const authId = req.body[GOTTI_GATE_AUTH_ID];
+        if(!authId) {
+            return res.status(401).json('Error with authentication')
+        }
+        const clientAuth = await this.getPlayerAuth(authId);
+        if(!clientAuth) {
+            return res.status(401).json('Error with authentication')
+        }
+        try {
+            const returnOptions = await this.onGateKeepHandler(clientOptions, this.publicGateData, clientAuth, req);
+            if(returnOptions) {
+                return res.status(200).json(returnOptions);
+            } else {
+                return res.status(401).json('Error authenticating');
+            }
+        } catch(err) {
+            let errMsg = err.message ? err.message : "Error authenticating";
+            return res.status(401).json(errMsg);
         }
     }
 
@@ -291,16 +357,16 @@ export class Gate {
         this.onGateKeepHandler = this.onGateKeepHandler.bind(this);
     }
 
-    private onGateKeepHandler(req, res) : any {
+    private onGateKeepHandler(availableGames, auth, clientOptions, req) : any {
         console.warn('Currently always returning true for your gateKeep function, please specify a gateKeep(req,res) handler in Gate.js for custom gate keeping.')
-        return true
+        return availableGames
     }
 
     private validateGameRequest(req) : any {
         if(!(req.body) || !(req.body['gameType'] || !(req.body['gameType'] in this.availableGamesByType))) {
             return { error: 'Bad request', code: 400 }
         }
-        return { gameType: req.body.gameType, options: req.body.options, auth: req.auth };
+        return { gameType: req.body.gameType  };
     }
 
     // gets connector for game type
@@ -313,18 +379,17 @@ export class Gate {
      *
      * @param serverIndex
      * @param auth
-     * @param seatOptions
+     * @param joinOptions
      * @returns {{host, port, gottiId, playerIndex }}
      */
-    private async addPlayerToConnector(serverIndex, auth?, seatOptions?) : Promise<any> {
+    private async addPlayerToConnector(serverIndex, auth?, clientJoinOptions?) : Promise<any> {
         const connectorData = this.connectorsByServerIndex[serverIndex];
         try {
-            console.log('sending reserve seat....');
-            const { host, port, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, seatOptions);
+            const { proxyId, gottiId, playerIndex } = await this.reserveSeat(serverIndex, auth, clientJoinOptions);
             connectorData.connectedClients++;
             //sorts
             this.gamesById[connectorData.gameId].connectorsData.sort(sortByProperty('connectedClients'));
-            return { host, port, gottiId, playerIndex } ;
+            return { proxyId, gottiId, playerIndex } ;
         } catch(err) {
             throw err;
         }
@@ -341,6 +406,7 @@ export class Gate {
         //sorts
         this.gamesById[connectorData.gameId].connectorsData.sort(sortByProperty('connectedClients'))
     }
+
 
     public startConnectorHeartbeat(interval=100000) {
         if(this.heartbeat) {
@@ -415,6 +481,70 @@ export class Gate {
     }
     */
 
+    private registerAuthResponders() {
+        this.responder.createResponse(GOTTI_GATE_CHANNEL_PREFIX + '-' + GateProtocol.RESERVE_AUTHENTICATION, (data) => {
+            const { auth, oldAuthId, refresh } = data;
+            const timeout = data.timeout ? data.timeout : this.authTimeout;
+            let old = null;
+            if(oldAuthId) {
+                old = this.authMap.get(oldAuthId);
+                if(old) {
+                    clearTimeout(old.timeout);
+                    this.authMap.delete(oldAuthId);
+                }
+            }
+
+            // trying to refresh an old auth that didnt exist. return early with false.
+            if(refresh && !old) {
+                return false;
+            }
+            const newAuthKey = generateId(9);
+            if(refresh) {
+                this.authMap.set(newAuthKey, {
+                    auth: old.auth,
+                    timeout: setTimeout(() => {
+                        this.authMap.delete(newAuthKey);
+                    }, timeout)
+                })
+            } else {
+                this.authMap.set(newAuthKey, {
+                    auth,
+                    timeout: setTimeout(() => {
+                        this.authMap.delete(newAuthKey);
+                    }, timeout)
+                })
+            }
+
+            return newAuthKey
+        });
+    }
+
+    public getConnectorsByGameId(gameId) {
+        return this.gamesById[gameId] ? this.gamesById[gameId].connectorsData : null;
+    }
+
+    public getAuths(ids?) {
+        if(ids === undefined || ids === null) {
+            ids = Object.keys(this.authMap);
+        } else {
+            ids = Array.isArray(ids) ? ids : [ids]
+        }
+        const requestedAuthMap = {};
+        let foundAuths = 0;
+        for(let i = 0; i < ids.length; i++) {
+            const auth = this.authMap.get(ids[i]);
+            if(auth) {
+                foundAuths++;
+                requestedAuthMap[ids[i]] = auth.auth;
+            }
+        }
+        if(foundAuths) {
+            return requestedAuthMap
+        } else {
+            return null;
+        }
+    }
+
     private getClientCountOnConnector(serverIndex) {
         return this.connectorsByServerIndex[serverIndex].connectedClients;
     }
@@ -427,6 +557,9 @@ export class Gate {
         if(this.requester) {
             this.requester.close();
             this.requestBroker.close();
+        }
+        if(this.responder) {
+            this.responder.close();
         }
     }
 }

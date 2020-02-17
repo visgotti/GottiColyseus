@@ -11,6 +11,11 @@ export function registerGracefulShutdown(callback) {
         process.once(signal, () => callback(signal)));
 }
 
+export function httpErrorHandler(res, err, code=500) {
+    err = (typeof err === 'object' && err.message) ? err.message : err;
+    return res.status(code).json(err);
+}
+
 export function retry(
     cb: Function,
     maxRetries: number = 3,
@@ -75,7 +80,9 @@ export function parseQueryString(query: string): any {
 
     return data;
 }
-export function generateId() { return nanoid(9); }
+export function generateId(len=9) {
+    return nanoid(len);
+}
 
 export function merge(a: any, ...objs: any[]): any {
     for (let i = 0, len = objs.length; i < len; i++) {
