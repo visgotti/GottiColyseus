@@ -1,5 +1,6 @@
 import { BaseWebServer } from "./Base";
 import { Gate } from '../Gate';
+import { ServerURI } from "../Connector";
 export declare class GateWebServer extends BaseWebServer {
     app: any;
     private server;
@@ -10,7 +11,7 @@ export declare class GateWebServer extends BaseWebServer {
     readonly port: number;
     private reserveGateRequest;
     gate: Gate;
-    constructor(gateURI: any, port?: any);
+    constructor(gateURI: ServerURI, port?: any);
     addHandler(route: any, handler: any): void;
     registerOnGetGames(handler: any): void;
     init(app?: any): Promise<boolean>;

@@ -8,7 +8,7 @@ function default_1(Base) {
         }
         addGlobalMasterServerHandler(masterURI, handler, id) {
             this.masterListener = new gotti_pubsub_1.Messenger(id);
-            this.masterListener.initializeSubscriber([masterURI]);
+            this.masterListener.initializeSubscriber([masterURI.public]);
             this.masterListener.createSubscription(37 /* GLOBAL_MASTER_MESSAGE */.toString(), 37 /* GLOBAL_MASTER_MESSAGE */.toString(), handler.bind(this));
         }
     };

@@ -1,12 +1,13 @@
 import { BackMaster } from 'gotti-channels/dist';
+import { ServerURI } from "./Connector";
 export declare type PlayerData = {
     gottiId: string;
     connectorId: string;
     p2p: boolean;
 };
 export declare type RelayServerOptions = {
-    connectorURIs: Array<string>;
-    relayURI: string;
+    connectorURIs: Array<ServerURI>;
+    relayURI: ServerURI;
 };
 export declare class RelayServer {
     masterChannel: BackMaster;

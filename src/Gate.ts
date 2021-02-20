@@ -1,6 +1,7 @@
 import { Messenger, Broker } from 'gotti-reqres/dist';
 import { GateProtocol, GOTTI_GATE_CHANNEL_PREFIX, GOTTI_GET_GAMES_OPTIONS, GOTTI_GATE_AUTH_ID } from './Protocol';
 import { sortByProperty, generateId } from './Util';
+import {ServerURI} from "./Connector";
 
 export interface ConnectorData {
     proxyId: string,
@@ -32,7 +33,7 @@ export interface GameData {
 }
 
 export interface GateConfig {
-    gateURI: string,
+    gateURI: ServerURI,
     gamesData: Array<GameData>,
 }
 
@@ -93,20 +94,20 @@ export class Gate {
     private _publicGateData: any = {};
     private publicGateDataChanged = true;
 
-    constructor(gateURI, redisURI?) {
+    constructor(gateURI: ServerURI, redisURI?: ServerURI) {
         this.gateKeep = this.gateKeep.bind(this);
         this.gameRequested = this.gameRequested.bind(this);
-        this.requestBroker = new Broker(gateURI, 'gate');
+        this.requestBroker = new Broker(gateURI.public, 'gate');
 
         this.requester = new Messenger({
             id: 'gate_requester',
-            brokerURI: gateURI,
+            brokerURI: gateURI.public,
             request: { timeout: 1000 }
         });
 
         this.responder = new Messenger({
             id: 'gate_responder',
-            brokerURI: gateURI,
+            brokerURI: gateURI.public,
             response: true
         })
 

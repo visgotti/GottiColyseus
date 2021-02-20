@@ -1,4 +1,5 @@
 import { BaseWebServer } from "./Base";
+import { ServerURI } from "../Connector";
 declare class AuthenticationBase extends BaseWebServer {
     app: any;
     private server;
@@ -16,7 +17,7 @@ declare class AuthenticationBase extends BaseWebServer {
     private authMap;
     readonly data: any;
     private authApi;
-    constructor(gateURI: any, port: any, app?: any, sessionTimeout?: any);
+    constructor(gateURI: ServerURI, port: any, app?: any, sessionTimeout?: any);
     init(dataInitHandler?: any, masterURI?: any): Promise<boolean>;
     addOnMasterMessageHandler(handler: any): void;
     addOnAuth(handler: any): void;
@@ -34,10 +35,10 @@ declare class AuthenticationBase extends BaseWebServer {
 declare const Authentication: {
     new (...args: any[]): {
         [x: string]: any;
-        masterServerURI: string;
+        masterServerURI: ServerURI;
         masterServerChannel: import("gotti-channels").FrontChannel;
         masterListener: import("gotti-pubsub").Messenger;
-        addGlobalMasterServerHandler(masterURI: any, handler: any, id: any): void;
+        addGlobalMasterServerHandler(masterURI: ServerURI, handler: any, id: any): void;
     };
 } & typeof AuthenticationBase;
 export default Authentication;

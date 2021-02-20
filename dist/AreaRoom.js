@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = require("events");
+const msgpack = require('notepack.io');
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
 var LISTEN_REQUEST_FROM;
 (function (LISTEN_REQUEST_FROM) {
@@ -71,14 +72,18 @@ class AreaRoom extends events_1.EventEmitter {
      * @param message
      */
     dispatchToAllClients(message) {
-        this.areaChannel.broadcast([28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from]);
+        this.areaChannel.broadcast([28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to]);
     }
     /**
      * sends system message to all clients who are listening to it
      * @param message
      */
     dispatchToLocalClients(message) {
-        this.areaChannel.broadcastLinked([28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from]);
+        this.areaChannel.broadcastLinked([28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to]);
+    }
+    dispatchToLocalClientsSpecified(message, clientIds) {
+        const encoded = msgpack.encode([28 /* SYSTEM_MESSAGE */, message.to, message.type, message.data]);
+        this.areaChannel.broadcastLinked([29 /* SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES */, encoded, ...clientIds]);
     }
     /**
      * sends system message to specific client.
@@ -86,10 +91,13 @@ class AreaRoom extends events_1.EventEmitter {
      * @param message
      */
     dispatchToClient(clientId, message) {
-        this.masterChannel.messageClient(clientId, [28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from]);
+        this.masterChannel.messageClient(clientId, [28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to]);
+    }
+    dispatchToClients(clientIds, message) {
+        this.masterChannel.messageClients(clientIds, [28 /* SYSTEM_MESSAGE */, message.type, message.data, message.to]);
     }
     dispatchToAreas(message, areaIds) {
-        this.areaChannel.sendMainFront([34 /* AREA_TO_AREA_SYSTEM_MESSAGE */, message.type, message.data, message.to, message.from, areaIds]);
+        this.areaChannel.sendMainFront([34 /* AREA_TO_AREA_SYSTEM_MESSAGE */, message.type, message.data, message.to, areaIds]);
     }
     dispatchToMaster(message) {
         this.areaChannel.sendMainFront([35 /* AREA_TO_MASTER_MESSAGE */, message]);
@@ -106,12 +114,11 @@ class AreaRoom extends events_1.EventEmitter {
                 //    this.onMessage();
             }
             else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {
-                // [ protocol, type, data, to, fromSystem, fromAreaId]
-                this.gottiProcess.messageQueue.addAreaMessage(message[5], {
+                // [ protocol, type, data, to, fromAreaId]
+                this.gottiProcess.messageQueue.addAreaMessage(message[4], {
                     type: message[1],
                     data: message[2],
                     to: message[3],
-                    from: message[4],
                 });
                 //  this.onMessage(message[1]);
             }
@@ -131,10 +138,10 @@ class AreaRoom extends events_1.EventEmitter {
                 //    this.onMessage();
             }
             else if (protocol === 28 /* SYSTEM_MESSAGE */) {
-                messageQueueClientDispatch(clientId, { type: message[1], data: message[2], to: message[3], from: message[4] });
+                messageQueueClientDispatch(clientId, { type: message[1], data: message[2], to: message[3] });
             }
             else if (protocol === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {
-                messageQueueInstantClientDispatch(clientId, { type: message[1], data: message[2], to: message[3], from: message[4] });
+                messageQueueInstantClientDispatch(clientId, { type: message[1], data: message[2], to: message[3] });
             }
         });
         this.areaChannel.onAddClientListen((clientUid, options) => {

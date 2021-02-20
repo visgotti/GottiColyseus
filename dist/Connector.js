@@ -1,16 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-/***************************************************************************************
- *  Modified implementation of the original Room class in colyseus, most of the code
- *  is copied directly from the version of colyseus the project was started with to prevent
- *  breaking changes that would come from extending or implementing it directly.
- *
- *  Original code was written by-
- *  https://github.com/colyseus and https://github.com/endel
- *
- *  modified to fit GottiColyseus by -
- *  https://github.com/visgotti
- ***************************************************************************************/
 const msgpack = require('notepack.io');
 const http = require("http");
 const Util_1 = require("./Util");
@@ -35,6 +24,7 @@ class Connector extends events_1.EventEmitter {
         this.autoDispose = true;
         this.metadata = null;
         this.masterChannel = null;
+        this.privateMasterChannel = null;
         this.clients = [];
         this.clientsById = {};
         this.reservedSeats = {};
@@ -83,7 +73,7 @@ class Connector extends events_1.EventEmitter {
         this.responder = new dist_1.Messenger({
             response: true,
             id: `${this.serverIndex}_responder`,
-            brokerURI: options.gateURI,
+            brokerURI: options.gateURI.public,
         });
         this.registerGateResponders();
         //this.setPatchRate(this.patchRate);
@@ -103,25 +93,37 @@ class Connector extends events_1.EventEmitter {
             this.relayMessages();
         }, this.messageRelayRate);
     }
+    extractURI(uri) {
+        const hasPrivate = !!this.connectorURI.private;
+        if (hasPrivate && uri.private) {
+            return uri.private;
+        }
+        return uri.public;
+    }
     async connectToAreas() {
         this.masterChannel = new dist_2.FrontMaster(this.serverIndex);
-        let backChannelURIs = [...this.areaServerURIs];
+        const hasPrivateURI = !!this.connectorURI.private;
+        let backChannelURIs = [...this.areaServerURIs.map(uri => {
+                return this.extractURI(uri);
+            })];
         let backChannelIds = [...this.areaRoomIds];
         if (this.masterServerURI) {
-            backChannelURIs.push(this.masterServerURI);
+            backChannelURIs.push(this.extractURI(this.masterServerURI));
             backChannelIds.push(Protocol_1.GOTTI_MASTER_CHANNEL_ID);
         }
         if (this.relayURI) {
-            backChannelURIs.push(this.relayURI);
+            backChannelURIs.push(this.extractURI(this.relayURI));
             backChannelIds.push(Protocol_1.GOTTI_RELAY_CHANNEL_ID);
         }
-        else {
-            throw new Error('Connector.connectToAreas is failing because we dont have a relayURI specified! Gotti-Servers v0.2.5 and up require you set up a relay server.');
+        this.masterChannel.initialize(this.connectorURI.public, backChannelURIs);
+        if (hasPrivateURI) {
+            this.privateMasterChannel = new dist_2.FrontMaster(-this.serverIndex);
         }
-        this.masterChannel.initialize(this.connectorURI, backChannelURIs);
         this.masterChannel.addChannels(backChannelIds);
         this.channels = this.masterChannel.frontChannels;
-        this.relayChannel = this.channels[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
+        if (this.relayURI) {
+            this.relayChannel = this.channels[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
+        }
         if (this.channels[Protocol_1.GOTTI_MASTER_CHANNEL_ID]) {
             this.masterServerChannel = this.channels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
         }
@@ -294,10 +296,10 @@ class Connector extends events_1.EventEmitter {
                 }
             }
             if (protocol === 109 /* PEER_REMOTE_SYSTEM_MESSAGE */) {
-                //Protocol.PEER_REMOTE_SYSTEM_MESSAGE, toGottiId, fromPlayerIndex, message.type, message.data, message.to, message.from]);
+                //Protocol.PEER_REMOTE_SYSTEM_MESSAGE, toGottiId, fromPlayerIndex, message.type, message.data, message.to]);
                 const toClient = this.clientsById[message[1]];
                 if (toClient) {
-                    Protocol_1.send(toClient, [protocol, message[2], message[3], message[4], message[5], message[6]]);
+                    Protocol_1.send(toClient, [protocol, message[2], message[3], message[4], message[5]]);
                 }
             }
         });
@@ -325,6 +327,14 @@ class Connector extends events_1.EventEmitter {
             }
             else if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
                 this.masterServerChannel.send([35 /* AREA_TO_MASTER_MESSAGE */, areaChannel.channelId, message[1]]);
+            }
+            else if (message[0] === 29 /* SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES */) {
+                // [protocol, encodedmessage, ...clientIds]
+                const clientIds = message.slice(2);
+                for (let i = 0; i < clientIds.length; i++) {
+                    const client = this.clientsById[clientIds[i]];
+                    client && Protocol_1.send(client, message[1], false);
+                }
             }
         });
     }
@@ -366,8 +376,8 @@ class Connector extends events_1.EventEmitter {
         }
         else if (protocol === 109 /* PEER_REMOTE_SYSTEM_MESSAGE */) {
             //   console.log('Connector _onWebClientMessage handlng PEER_REMOTE_SYSTEM_MESSAGE for peer', decoded[1], 'from player:', client.gottiId);
-            //[Protocol.PEER_REMOTE_SYSTEM_MESSAGE, peerIndex, message.type, message.data, message.to, message.from, playerIndex]);
-            this.relayChannel.send([...decoded, client.playerIndex]);
+            //[Protocol.PEER_REMOTE_SYSTEM_MESSAGE, peerIndex, message.type, message.data, message.to, playerIndex]);
+            this.relayChannel && this.relayChannel.send([...decoded, client.playerIndex]);
         }
         else if (protocol === 110 /* PEERS_REMOTE_SYSTEM_MESSAGE */) {
         }
@@ -382,26 +392,23 @@ class Connector extends events_1.EventEmitter {
         else if (protocol === 100 /* CLIENT_WEB_RTC_ENABLED */) {
             if (this.relayChannel) {
                 // [sdp, ice]
-                console.log('Connector _onWebClientMessage handlng CLIENT_WEB_RTC_ENABLED for client with player index', client.playerIndex);
                 this.relayChannel.send([100 /* CLIENT_WEB_RTC_ENABLED */, client.playerIndex]);
             }
         }
         else if (protocol === 102 /* DISABLED_CLIENT_P2P */) {
             // [sdp, ice]
-            this.relayChannel.send([102 /* DISABLED_CLIENT_P2P */, client.playerIndex]);
+            this.relayChannel && this.relayChannel.send([102 /* DISABLED_CLIENT_P2P */, client.playerIndex]);
         }
         else if (protocol === 111 /* SIGNAL_REQUEST */) {
             // [protocol, toPlayerIndex, { sdp, candidate }
-            console.log('Connector _onWebClientMessage handlng SIGNAL_REQUEST that should be sent to', decoded[1], 'and from playerIndex:', client.playerIndex, 'the sdp/candidate info was', decoded[2]);
-            this.relayChannel.send([protocol, decoded[1], decoded[2], client.playerIndex, this.relayChannel.frontUid]);
+            this.relayChannel && this.relayChannel.send([protocol, decoded[1], decoded[2], client.playerIndex, this.relayChannel.frontUid]);
         }
         else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
-            console.log('GOT PEER CONNECTION REQUEST BACK FROM CLIENT!!!!!!!!!!!!!! SEND TO RELAY');
             // protocol, toPlayerIndex, { sdp, candidate }, systemName, options
-            this.relayChannel.send([protocol, decoded[1], decoded[2], decoded[3], decoded[4], client.playerIndex, this.relayChannel.frontUid]);
+            this.relayChannel && this.relayChannel.send([protocol, decoded[1], decoded[2], decoded[3], decoded[4], client.playerIndex, this.relayChannel.frontUid]);
         }
         else if (protocol === 113 /* SIGNAL_FAILED */) {
-            this.relayChannel.send([protocol, message[1], client.playerIndex]);
+            this.relayChannel && this.relayChannel.send([protocol, message[1], client.playerIndex]);
         }
     }
     async addAreaListen(client, areaId, options) {
@@ -466,9 +473,6 @@ class Connector extends events_1.EventEmitter {
         Protocol_1.send(client, [10 /* JOIN_CONNECTOR */, client.joinedOptions]);
         if (this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
             this.relayChannel.send([10 /* JOIN_CONNECTOR */, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid]);
-        }
-        else {
-            throw new Error('Connector._onJoin is failing because we dont have a relayURI specified! Gotti-Servers v0.2.5 and up require you set up a relay server.');
         }
         client.on('message', this._onWebClientMessage.bind(this, client));
         client.once('close', this._onLeave.bind(this, client));

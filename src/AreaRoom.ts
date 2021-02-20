@@ -2,6 +2,7 @@ import { BackChannel, BackMaster } from 'gotti-channels/dist';
 import { Protocol } from './Protocol';
 
 import { EventEmitter } from 'events';
+const msgpack = require('notepack.io');
 
 import { AreaClient as Client } from './AreaClient';
 
@@ -19,15 +20,13 @@ export interface BroadcastOptions {
 export type SystemMessage = {
     type: number | string,
     data: any,
-    to: Array<number | string>,
-    from: number | string,
+    to: number | string,
 }
 
 export type AreaToAreaSystemMessage = {
     type: number | string,
     data: any,
     to: Array<number | string>,
-    from: number | string,
     toAreaIds: Array<number | string>,
 }
 
@@ -78,7 +77,6 @@ export class AreaRoom extends EventEmitter {
             this.masterChannel.messageClient(clientId, [Protocol.ADD_CLIENT_AREA_LISTEN, areaId, options]);
         };
         this.gottiProcess.addRoom(this);
-
         this.gottiProcess.startAllSystems();
         this.gottiProcess.startLoop();
     }
@@ -112,7 +110,7 @@ export class AreaRoom extends EventEmitter {
      * @param message
      */
     public dispatchToAllClients(message: SystemMessage): void {
-        this.areaChannel.broadcast([Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to, message.from ]);
+        this.areaChannel.broadcast([Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to ]);
     }
 
     /**
@@ -120,7 +118,12 @@ export class AreaRoom extends EventEmitter {
      * @param message
      */
     public dispatchToLocalClients(message: SystemMessage) {
-        this.areaChannel.broadcastLinked([Protocol.SYSTEM_MESSAGE,  message.type, message.data, message.to, message.from ]);
+        this.areaChannel.broadcastLinked([Protocol.SYSTEM_MESSAGE,  message.type, message.data, message.to]);
+    }
+
+    public dispatchToLocalClientsSpecified(message: SystemMessage, clientIds: Array<string>) {
+        const encoded = msgpack.encode([Protocol.SYSTEM_MESSAGE, message.to, message.type, message.data]);
+        this.areaChannel.broadcastLinked([Protocol.SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES, encoded, ...clientIds])
     }
 
     /**
@@ -129,11 +132,15 @@ export class AreaRoom extends EventEmitter {
      * @param message
      */
     public dispatchToClient(clientId: string, message: SystemMessage) {
-        this.masterChannel.messageClient(clientId, [Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to, message.from]);
+        this.masterChannel.messageClient(clientId, [Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to]);
+    }
+
+    public dispatchToClients(clientIds: Array<string>, message: SystemMessage) {
+        this.masterChannel.messageClients(clientIds, [Protocol.SYSTEM_MESSAGE, message.type, message.data, message.to]);
     }
 
     public dispatchToAreas(message: SystemMessage, areaIds?: Array<string>) {
-        this.areaChannel.sendMainFront([Protocol.AREA_TO_AREA_SYSTEM_MESSAGE, message.type, message.data, message.to, message.from, areaIds])
+        this.areaChannel.sendMainFront([Protocol.AREA_TO_AREA_SYSTEM_MESSAGE, message.type, message.data, message.to, areaIds])
     }
 
     public dispatchToMaster(message: any) {
@@ -149,12 +156,11 @@ export class AreaRoom extends EventEmitter {
             if (message[0] === Protocol.AREA_DATA) {
                 //    this.onMessage();
             } else if (message[0] === Protocol.AREA_TO_AREA_SYSTEM_MESSAGE) {
-                // [ protocol, type, data, to, fromSystem, fromAreaId]
-                this.gottiProcess.messageQueue.addAreaMessage(message[5], {
+                // [ protocol, type, data, to, fromAreaId]
+                this.gottiProcess.messageQueue.addAreaMessage(message[4], {
                     type: message[1],
                     data: message[2],
                     to: message[3],
-                    from: message[4],
                 });
               //  this.onMessage(message[1]);
             } else if (message[0] === Protocol.MASTER_TO_AREA_BROADCAST) {
@@ -176,9 +182,9 @@ export class AreaRoom extends EventEmitter {
             if (protocol === Protocol.AREA_DATA) {
                 //    this.onMessage();
             } else if (protocol === Protocol.SYSTEM_MESSAGE) {
-                messageQueueClientDispatch(clientId, { type: message[1], data: message[2], to: message[3], from: message[4] });
+                messageQueueClientDispatch(clientId, { type: message[1], data: message[2], to: message[3]});
             } else if (protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
-                messageQueueInstantClientDispatch(clientId, { type: message[1], data: message[2], to: message[3], from: message[4] });
+                messageQueueInstantClientDispatch(clientId, { type: message[1], data: message[2], to: message[3] });
             }
         });
 

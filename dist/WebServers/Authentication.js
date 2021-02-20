@@ -18,7 +18,7 @@ class AuthenticationBase extends Base_1.BaseWebServer {
         this.port = port;
         this.requester = new dist_1.Messenger({
             id: 'authentication_requester',
-            brokerURI: gateURI,
+            brokerURI: gateURI.public,
             request: { timeout: 1000 }
         });
         if (app) {

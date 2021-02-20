@@ -28,6 +28,8 @@ export const enum Protocol {
     AREA_DATA = 26,
     AREA_STATE_UPDATE = 27,
     SYSTEM_MESSAGE = 28,
+    SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES,
+    ENCODED_SYSTEM_MESSAGE,
     IMMEDIATE_SYSTEM_MESSAGE = 29,
 
         //global messages 30 - 39

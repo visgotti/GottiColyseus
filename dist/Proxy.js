@@ -18,7 +18,7 @@ class Proxy {
         this.app = express();
         this.connectorProxies = {};
         const wsProtocol = useSSL ? 'https' : 'http';
-        connectorProxies.forEach(({ proxyId, host, port }) => {
+        connectorProxies && connectorProxies.forEach(({ proxyId, host, port }) => {
             this.connectorProxies[`${Protocol_1.GOTTI_HTTP_ROUTES.CONNECTOR}/${proxyId}`] = `${wsProtocol}://${host}:${port}`;
         });
     }
@@ -34,8 +34,8 @@ class Proxy {
     }
     async init() {
         this.app.use(helmet());
-        this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.BASE_AUTH}`, proxy({ target: this.authUrl }));
-        this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.BASE_GATE}`, proxy({ target: this.gateUrl }));
+        this.authUrl && this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.BASE_AUTH}`, proxy({ target: this.authUrl }));
+        this.gateUrl && this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.BASE_GATE}`, proxy({ target: this.gateUrl }));
         this.app.use(`${Protocol_1.GOTTI_HTTP_ROUTES.BASE_PUBLIC_API}`, proxy({
             router: this.getApiHostRoundRobin(),
             target: this.webUrls[this.currentWebContentIdx],

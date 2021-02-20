@@ -2,6 +2,7 @@ import * as path from 'path';
 import { AreaRoom } from './AreaRoom';
 
 import { BackMaster, BackChannel } from 'gotti-channels/dist';
+import {ServerURI} from "./Connector";
 
 export type AreaOption = {
     id: string,
@@ -12,8 +13,8 @@ export type AreaOption = {
 export type AreaServerOptions = {
     serverIndex: number,
     areas: Array<AreaOption>,
-    connectorURIs: Array<string>;
-    areaURI: string;
+    connectorURIs: Array<ServerURI>;
+    areaURI: ServerURI;
 }
 
 export class AreaServer {
@@ -23,7 +24,7 @@ export class AreaServer {
 
     constructor(options: AreaServerOptions) {
         this.masterChannel = new BackMaster(options.serverIndex);
-        this.masterChannel.initialize(options.areaURI, options.connectorURIs);
+        this.masterChannel.initialize(options.areaURI.public, options.connectorURIs.map(c=>c.public));
 
         const areaIds = options.areas.map(area => {
             return area.id;

@@ -8,7 +8,7 @@ class MasterServer {
         this.masterChannel = null;
         this.channel = null;
         this.masterChannel = new dist_1.BackMaster(Protocol_1.GOTTI_MASTER_SERVER_INDEX);
-        this.masterChannel.initialize(options.masterURI, options.connectorURIs);
+        this.masterChannel.initialize(options.masterURI.public, options.connectorURIs.map(c => c.public));
         this.masterChannel.addChannels([Protocol_1.GOTTI_MASTER_CHANNEL_ID]);
         this.channel = this.masterChannel.backChannels[Protocol_1.GOTTI_MASTER_CHANNEL_ID];
         this.masterChannel.messenger.createPublish(37 /* GLOBAL_MASTER_MESSAGE */.toString());

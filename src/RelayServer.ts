@@ -4,6 +4,7 @@
 
 import {BackChannel, BackMaster} from 'gotti-channels/dist';
 import {Protocol, GOTTI_RELAY_SERVER_INDEX, GOTTI_RELAY_CHANNEL_ID} from "./Protocol"
+import {ServerURI} from "./Connector";
 
 export type PlayerData = {
     gottiId: string,
@@ -12,8 +13,8 @@ export type PlayerData = {
 }
 
 export type RelayServerOptions = {
-    connectorURIs: Array<string>;
-    relayURI: string;
+    connectorURIs: Array<ServerURI>;
+    relayURI: ServerURI;
 }
 
 export class RelayServer {
@@ -24,7 +25,7 @@ export class RelayServer {
 
     constructor(options: RelayServerOptions) {
         this.masterChannel = new BackMaster(GOTTI_RELAY_SERVER_INDEX);
-        this.masterChannel.initialize(options.relayURI, options.connectorURIs);
+        this.masterChannel.initialize(options.relayURI.public, options.connectorURIs.map(c => c.public));
         this.masterChannel.addChannels([GOTTI_RELAY_CHANNEL_ID]);
         this.channel = this.masterChannel.backChannels[GOTTI_RELAY_CHANNEL_ID];
         this.registerBackChannelMessages();
@@ -52,7 +53,6 @@ export class RelayServer {
                 // [protocol, toPlayerIndex, fromPlayerIndex]
                 this.handlePeerFailedConnection(message[1], message[2]);
             }else if(protocol === Protocol.PEER_CONNECTION_REQUEST) {
-                console.log('RELAY SERVER IS HANDLING PEER CONNECTION handlePeerConnectionRequest!!!!');
                 // [protocol, toPlayerIndex, { sdp, candidate  }, fromSystemName, requestOptions, fromPlayerIndex, frontUid]
                 this.handlePeerConnectionRequest(message[1], message[2], message[3], message[4], message[5], message[6])
             } else if (protocol === Protocol.DISABLED_CLIENT_P2P) {

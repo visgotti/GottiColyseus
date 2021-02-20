@@ -3,6 +3,10 @@ import { FrontMaster } from 'gotti-channels/dist';
 import { EventEmitter } from 'events';
 import { ConnectorClient as Client } from './ConnectorClient';
 export declare type SimulationCallback = (deltaTime?: number) => void;
+export declare type ServerURI = {
+    private: string;
+    public: string;
+};
 export declare type ConnectorOptions = IServerOptions & {
     pingTimeout?: number;
     gracefullyShutdown?: boolean;
@@ -10,13 +14,13 @@ export declare type ConnectorOptions = IServerOptions & {
     port?: number;
     messageRelayRate?: number;
     serverIndex: number;
-    connectorURI: string;
+    connectorURI: ServerURI;
     gameData?: any;
-    gateURI: string;
-    masterServerURI?: string;
+    gateURI: ServerURI;
+    masterServerURI?: ServerURI;
     areaRoomIds: Array<string>;
-    areaServerURIs: Array<string>;
-    relayURI?: string;
+    areaServerURIs: Array<ServerURI>;
+    relayURI?: ServerURI;
 };
 export interface RoomAvailable {
     clients: number;
@@ -36,9 +40,9 @@ export declare abstract class Connector extends EventEmitter {
     gameData: any;
     options: ConnectorOptions;
     serverIndex: number;
-    connectorURI: string;
+    connectorURI: ServerURI;
     areaRoomIds: Array<string>;
-    areaServerURIs: Array<string>;
+    areaServerURIs: Array<ServerURI>;
     port: number;
     roomName: string;
     maxClients: number;
@@ -47,6 +51,7 @@ export declare abstract class Connector extends EventEmitter {
     state: any;
     metadata: any;
     masterChannel: FrontMaster;
+    privateMasterChannel: FrontMaster;
     channels: any;
     clients: Client[];
     clientsById: {
@@ -67,6 +72,7 @@ export declare abstract class Connector extends EventEmitter {
     protected stopMessageRelay(): void;
     private relayMessages;
     protected onConnection: (client: any, req: any) => void;
+    private extractURI;
     connectToAreas(): Promise<boolean>;
     abstract onMessage(client: Client, message: any): void;
     onInit?(options: any): void;

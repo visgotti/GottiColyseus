@@ -11,14 +11,12 @@ export interface BroadcastOptions {
 export declare type SystemMessage = {
     type: number | string;
     data: any;
-    to: Array<number | string>;
-    from: number | string;
+    to: number | string;
 };
 export declare type AreaToAreaSystemMessage = {
     type: number | string;
     data: any;
     to: Array<number | string>;
-    from: number | string;
     toAreaIds: Array<number | string>;
 };
 export declare class AreaRoom extends EventEmitter {
@@ -51,12 +49,14 @@ export declare class AreaRoom extends EventEmitter {
      * @param message
      */
     dispatchToLocalClients(message: SystemMessage): void;
+    dispatchToLocalClientsSpecified(message: SystemMessage, clientIds: Array<string>): void;
     /**
      * sends system message to specific client.
      * @param client
      * @param message
      */
     dispatchToClient(clientId: string, message: SystemMessage): void;
+    dispatchToClients(clientIds: Array<string>, message: SystemMessage): void;
     dispatchToAreas(message: SystemMessage, areaIds?: Array<string>): void;
     dispatchToMaster(message: any): void;
     private _onConnectorMessage;

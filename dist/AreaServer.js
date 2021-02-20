@@ -7,7 +7,7 @@ class AreaServer {
         this.masterChannel = null;
         this.areas = {};
         this.masterChannel = new dist_1.BackMaster(options.serverIndex);
-        this.masterChannel.initialize(options.areaURI, options.connectorURIs);
+        this.masterChannel.initialize(options.areaURI.public, options.connectorURIs.map(c => c.public));
         const areaIds = options.areas.map(area => {
             return area.id;
         });

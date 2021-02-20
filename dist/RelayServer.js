@@ -11,7 +11,7 @@ class RelayServer {
         this.channel = null;
         this.clientMap = {};
         this.masterChannel = new dist_1.BackMaster(Protocol_1.GOTTI_RELAY_SERVER_INDEX);
-        this.masterChannel.initialize(options.relayURI, options.connectorURIs);
+        this.masterChannel.initialize(options.relayURI.public, options.connectorURIs.map(c => c.public));
         this.masterChannel.addChannels([Protocol_1.GOTTI_RELAY_CHANNEL_ID]);
         this.channel = this.masterChannel.backChannels[Protocol_1.GOTTI_RELAY_CHANNEL_ID];
         this.registerBackChannelMessages();

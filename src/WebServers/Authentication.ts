@@ -21,6 +21,7 @@ import {
 type AuthMasterHandler = (message: any) => void;
 
 import MasterServerListener from "../Mixins/MasterServerListener";
+import {ServerURI} from "../Connector";
 
 class AuthenticationBase extends BaseWebServer {
     public app: any;
@@ -45,13 +46,13 @@ class AuthenticationBase extends BaseWebServer {
 
     private authApi: any;
 
-    constructor(gateURI, port, app?, sessionTimeout?) {
+    constructor(gateURI: ServerURI, port, app?, sessionTimeout?) {
         super();
         this.authTimeout = sessionTimeout ? sessionTimeout : this.authTimeout;
         this.port = port;
         this.requester = new Messenger({
             id: 'authentication_requester',
-            brokerURI: gateURI,
+            brokerURI: gateURI.public,
             request: { timeout: 1000 }
         });
         if(app) {

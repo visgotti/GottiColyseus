@@ -1,12 +1,13 @@
 import { ConnectorClient as Client } from "./ConnectorClient";
+import { ServerURI } from "./Connector";
 export interface ConnectorData {
     host: string;
     port: number;
     serverIndex: number;
 }
 export interface MasterConfig {
-    masterURI: string;
-    connectorURIs: Array<string>;
+    masterURI: ServerURI;
+    connectorURIs: Array<ServerURI>;
 }
 export declare abstract class MasterServer {
     private connectorsByServerIndex;

@@ -11,6 +11,7 @@ import { httpErrorHandler } from "./Util";
 import { AuthWebServer } from './';
 import { GateWebServer } from './WebServers/Gate';
 import { BaseWebServer } from "./WebServers/Base";
+import {ServerURI} from "./Connector";
 
 export class WebServer extends BaseWebServer {
     public app: any;
@@ -61,11 +62,11 @@ export class WebServer extends BaseWebServer {
         })
     }
 
-    public hostAuth(gateURI, authSessionTimeout?) {
+    public hostAuth(gateURI: ServerURI, authSessionTimeout?) {
         this.auth = new AuthWebServer(gateURI, this.port, this.app, authSessionTimeout);
     }
 
-    public async hostGate(gateURI) {
+    public async hostGate(gateURI: ServerURI) {
         this.gate = new GateWebServer(gateURI);
         return this.gate.init(this.app);
     }

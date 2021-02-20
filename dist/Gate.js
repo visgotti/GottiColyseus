@@ -22,15 +22,15 @@ class Gate {
         this.publicGateDataChanged = true;
         this.gateKeep = this.gateKeep.bind(this);
         this.gameRequested = this.gameRequested.bind(this);
-        this.requestBroker = new dist_1.Broker(gateURI, 'gate');
+        this.requestBroker = new dist_1.Broker(gateURI.public, 'gate');
         this.requester = new dist_1.Messenger({
             id: 'gate_requester',
-            brokerURI: gateURI,
+            brokerURI: gateURI.public,
             request: { timeout: 1000 }
         });
         this.responder = new dist_1.Messenger({
             id: 'gate_responder',
-            brokerURI: gateURI,
+            brokerURI: gateURI.public,
             response: true
         });
         this.registerAuthResponders();

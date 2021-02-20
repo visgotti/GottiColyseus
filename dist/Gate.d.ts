@@ -1,3 +1,4 @@
+import { ServerURI } from "./Connector";
 export interface ConnectorData {
     proxyId: string;
     host: string;
@@ -28,7 +29,7 @@ export interface GameData {
     areaData?: any;
 }
 export interface GateConfig {
-    gateURI: string;
+    gateURI: ServerURI;
     gamesData: Array<GameData>;
 }
 export declare type ClientConnectorLookup = Map<string, number>;
@@ -54,7 +55,7 @@ export declare class Gate {
     private makeGameUnavailable;
     private _publicGateData;
     private publicGateDataChanged;
-    constructor(gateURI: any, redisURI?: any);
+    constructor(gateURI: ServerURI, redisURI?: ServerURI);
     getPlayerAuth(authId: any): Promise<any>;
     onAuthentication(onAuthHandler: any): void;
     authenticationHandler(req: any, res: any): void;

@@ -21,6 +21,7 @@ import {
 } from "../Protocol";
 
 import { Gate } from '../Gate';
+import {ServerURI} from "../Connector";
 
 export class GateWebServer extends BaseWebServer{
     public app: any;
@@ -33,7 +34,7 @@ export class GateWebServer extends BaseWebServer{
     private reserveGateRequest: Function;
 
     public gate: Gate;
-    constructor(gateURI, port?) {
+    constructor(gateURI: ServerURI, port?) {
         super();
         this.gate = new Gate(gateURI);
         this.port = port;

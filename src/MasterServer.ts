@@ -3,6 +3,7 @@ import {BackChannel, BackMaster} from "gotti-channels/dist";
 import { GateProtocol, Protocol, GOTTI_MASTER_CHANNEL_ID, GOTTI_MASTER_SERVER_INDEX } from './Protocol';
 import { sortByProperty, generateId } from './Util';
 import {ConnectorClient as Client} from "./ConnectorClient";
+import {ServerURI} from "./Connector";
 
 export interface ConnectorData {
     host: string,
@@ -11,8 +12,8 @@ export interface ConnectorData {
 }
 
 export interface MasterConfig {
-    masterURI: string,
-    connectorURIs: Array<string>,
+    masterURI: ServerURI,
+    connectorURIs: Array<ServerURI>,
 }
 
 export abstract class MasterServer {
@@ -23,7 +24,7 @@ export abstract class MasterServer {
 
     constructor(options: MasterConfig) {
         this.masterChannel = new BackMaster(GOTTI_MASTER_SERVER_INDEX);
-        this.masterChannel.initialize(options.masterURI, options.connectorURIs);
+        this.masterChannel.initialize(options.masterURI.public, options.connectorURIs.map(c => c.public));
         this.masterChannel.addChannels([GOTTI_MASTER_CHANNEL_ID]);
         this.channel = this.masterChannel.backChannels[GOTTI_MASTER_CHANNEL_ID];
 
