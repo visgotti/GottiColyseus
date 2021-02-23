@@ -344,9 +344,7 @@ class Connector extends events_1.EventEmitter {
             Protocol_1.send(client, 24 /* WRITE_AREA_ERROR */);
             return false;
         }
-        console.log('running get initialWriteArea');
         const write = this.getInitialWriteArea(client, this.areaData, clientOptions);
-        console.log('write area id was', write.areaId);
         if (write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);

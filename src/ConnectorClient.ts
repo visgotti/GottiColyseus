@@ -9,7 +9,9 @@ import * as WebSocket from 'ws';
 import * as http from 'http';
 
 // Export 'WebSocket' as 'Client' with 'id' property.
-export type ConnectorClient = WebSocket & {
+export type ConnectorClient = {
+    webSocket?: WebSocket,
+    webRTCChannel?: any,
     upgradeReq?: http.IncomingMessage; // cross-compatibility for ws (v3.x+) and uws
     id: string;
     gottiId: string;

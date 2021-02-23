@@ -1,3 +1,5 @@
+import {IConnectorClient} from "./ConnectorClients/IConnectorClient";
+
 const msgpack = require('notepack.io');
 
 import * as WebSocket from 'ws';
@@ -45,6 +47,8 @@ export const enum Protocol {
     GLOBAL_MASTER_MESSAGE = 37,
         // Generic messages (50~60)
     BAD_REQUEST = 50,
+
+    INITIATE_SERVER_WEBRTC_CONNECTION,
 
     // P2P/WEBRTC Codes
     CLIENT_WEB_RTC_ENABLED = 100,
@@ -134,8 +138,8 @@ export function decode(message: any) {
     return message;
 }
 
-export function send(client: ConnectorClient, message: any, encode: boolean = true) {
-    if (client.readyState === WebSocket.OPEN) {
+export function send(client: IConnectorClient, message: any, encode: boolean = true) {
+    if (client.state === "open") {
         client.send((encode && msgpack.encode(message)) || message);
     }
 }

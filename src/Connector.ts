@@ -33,11 +33,16 @@ import * as fossilDelta from 'fossil-delta';
 
 const nanoid = require('nanoid');
 
+import nodeDataChannel, {PeerConnection} from 'node-datachannel'
+
+
 import { EventEmitter } from 'events';
 
-import { ConnectorClient as Client } from './ConnectorClient';
+import {ConnectorClient, ConnectorClient as Client} from './ConnectorClient';
 import {setInterval} from "timers";
-
+import {IConnectorClient} from "./ConnectorClients/IConnectorClient";
+import {WebRTCConnectorClient } from "./ConnectorClients/WebRTC";
+import {WebSocketConnectorClient} from "./ConnectorClients/WebSocket"
 //import { debugAndPrintError, debugPatch, debugPatchData } from '../../colyseus/lib/Debug';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
@@ -81,15 +86,21 @@ export interface BroadcastOptions {
 }
 
 export abstract class Connector extends EventEmitter {
+    private candidates : Array< {candidate: string, mid: string }> = [];
     protected httpServer: any;
 
     private relayChannel?: FrontChannel;
     private masterServerChannel?: FrontChannel;
 
+    private peerConnections: {[id: string]: { peer: PeerConnection, server: PeerConnection }};
+
+    private awaitingWebRTCConnections : {[id: string]: WebRTCConnectorClient } = {}
+
     public areaData: {[areaId: string]: any};
     public gameData: any = {};
 
     public options: ConnectorOptions;
+    private iceServers: Array<string>;
 
     public serverIndex: number;
     public connectorURI: ServerURI;
@@ -108,18 +119,19 @@ export abstract class Connector extends EventEmitter {
     public privateMasterChannel : FrontMaster = null;
     public channels: any;
 
-    public clients: Client[] = [];
-    public clientsById: {[gottiId: string]: Client} = {};
+    public clients: IConnectorClient[] = [];
+    public clientsById: {[gottiId: string]: IConnectorClient} = {};
 
     private _patchInterval: NodeJS.Timer;
     private _relayMessageTimeout: NodeJS.Timer;
 
-    private server: any;
+    private websocketServer: any;
     private gateURI: ServerURI;
     private masterServerURI: ServerURI;
     private relayURI: ServerURI;
 
     private responder: Responder;
+    private serverWebRtcConnection;
 
     private reservedSeats: {[clientId: string]: any} = {};
 
@@ -180,9 +192,8 @@ export abstract class Connector extends EventEmitter {
         }, this.messageRelayRate)
     }
 
-    protected onConnection = (client: Client, req: http.IncomingMessage & any) => {
+    protected onWebSocketConnection = (client: IConnectorClient, req: http.IncomingMessage & any) => {
         client.pingCount = 0;
-
         const upgradeReq = req || client.upgradeReq;
         const url = parseURL(upgradeReq.url);
         const query = parseQueryString(url.query);
@@ -192,7 +203,6 @@ export abstract class Connector extends EventEmitter {
             send(client, [Protocol.JOIN_CONNECTOR_ERROR])
         } else {
             client.p2p_capable = query.isWebRTCSupported;
-
             client.gottiId = req.gottiId;
             client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
             this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].joinOptions);
@@ -247,16 +257,16 @@ export abstract class Connector extends EventEmitter {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
                     this.areaData = connection.backChannelOptions;
-
                     // connection backChannelOptions were made with area channels in mind.. so
                     // these frameworked channels keys should be deleted if theyre in.
                     delete this.areaData[GOTTI_RELAY_CHANNEL_ID];
                     delete this.areaData[GOTTI_MASTER_CHANNEL_ID];
 
                     this.registerChannelMessages();
-                    this.server = new WebSocket.Server(this.options);
-                    this.server.on('connection', this.onConnection.bind(this));
-                    this.on('connection', this.onConnection.bind(this)); // used for testing
+                    this.websocketServer = new WebSocket.Server(this.options);
+                    this.websocketServer.on('connection', this.onWebSocketConnection.bind(this));
+                    this.webRtcServer = new nodeDataChannel.PeerConnection("Peer1", { iceServers: ["stun:stun.l.google.com:19302"] });;
+                    this.on('connection', this.onWebSocketConnection.bind(this)); // used for testing
                     this.startMessageRelay();
                     return resolve(true);
                 });
@@ -333,7 +343,7 @@ export abstract class Connector extends EventEmitter {
      * @param clientOptions - options sent from the client when starting the game.
      * @returns { areaId: string, options: any } - areaId the client is going to write to and any additional options to send.
      */
-    public abstract getInitialWriteArea(client: Client, areaData, clientOptions?) : { areaId: string, options: any }
+    public abstract getInitialWriteArea(client: IConnectorClient, areaData, clientOptions?) : { areaId: string, options: any }
 
     protected broadcast(data: any, options?: BroadcastOptions): boolean {
         // no data given, try to broadcast patched state
@@ -370,6 +380,36 @@ export abstract class Connector extends EventEmitter {
                 throw new Error('Unhandled client message protocol'+ message[0]);
             }
         });
+    }
+    private async startWebRtcConnection(client: WebSocketConnectorClient) : Promise<WebRTCConnectorClient> {
+        let configuration: nodeDataChannel.RtcConfig = {
+            // sdpSemantics: 'unified-plan',
+            // iceTransportPolicy: iceTransportPolicy,
+            iceServers: this.iceServers.map(ice => ice as string)
+        }
+
+        const peerConnection = new nodeDataChannel.PeerConnection(client.id as string, configuration);
+        const webRTCClient = new WebRTCConnectorClient(peerConnection, client.channelClient);
+
+        this.awaitingWebRTCConnections[client.gottiId] = WebRTCClient;
+
+        return new Promise((resolve, reject) => {
+            webRTCClient.once('finished', (success: boolean) => {
+                if(!(this.awaitingWebRTCConnections[client.gottiId])) return;
+                delete this.awaitingWebRTCConnections[client.gottiId];
+                if(success) {
+                    this.handleFinishSuccesfulWebSocketToWebRTCClient(client, webRTCClient);
+                    return resolve()
+                } else {
+                    this.handleFinishFailedWebSocketToWebRTCClient(client, webRTCClient);
+                    return resolve(null);
+                }
+            });
+        });
+
+        peerConnection.onDataChannel(cb => {
+        });
+        return null;
     }
 
     // iterates through all the channels the connector
@@ -414,7 +454,6 @@ export abstract class Connector extends EventEmitter {
         }
         relayChannel.onMessage((message) => {
             const protocol = message[0];
-
             if(protocol === Protocol.ENABLED_CLIENT_P2P_SUCCESS) {
            //     console.log('Connector.registerRelayMessages ENABLED_CLIENT_P2P_SUCCESS for player', message[1]);
                 const client = this.clientsById[message[1]];
@@ -505,8 +544,34 @@ export abstract class Connector extends EventEmitter {
         }
     }
 
+    private transferClientData(oldClient:IConnectorClient, newClient: IConnectorClient) {
+        newClient.gottiId = oldClient.gottiId;
+        newClient.playerIndex = oldClient.playerIndex;
+        newClient.state = oldClient.state;
+        newClient.id = oldClient.id;
+        newClient.joinOptions = oldClient.joinOptions;
+        newClient.auth = oldClient.auth;
+        newClient.pingCount = oldClient.pingCount;
+        newClient.p2p_capable = oldClient.p2p_capable;
+        newClient.p2p_enabled = oldClient.p2p_enabled;
+    }
 
-    private _onWebClientMessage(client: Client, message: any) {
+    private handleFinishSuccesfulWebSocketToWebRTCClient(webSocketClient: WebSocketConnectorClient, webRtcClient: WebRTCConnectorClient) : WebRTCConnectorClient {
+        const index = this.clients.indexOf(webSocketClient);
+        webSocketClient.close();
+        if(index > -1) {
+            // todo: gracefully disconnect the websocket.
+            this.clients[index] = webRtcClient;
+            this.clientsById[webSocketClient.gottiId] = webRtcClient;
+        } else {
+            throw new Error(`Websocket client was not found.`)
+        }
+        this.transferClientData(webSocketClient, webRtcClient);
+        return webRtcClient;
+    }
+
+
+    private _onWebClientMessage(client: IConnectorClient, message: any) {
         let decoded = decode(message);
         if (!decoded) {
         //    debugAndPrintError(`${this.roomName} (${this.roomId}), couldn't decode message: ${message}`);
@@ -526,13 +591,11 @@ export abstract class Connector extends EventEmitter {
             //[Protocol.PEER_REMOTE_SYSTEM_MESSAGE, peerIndex, message.type, message.data, message.to, playerIndex]);
             this.relayChannel && this.relayChannel.send([...decoded, client.playerIndex])
         } else if(protocol === Protocol.PEERS_REMOTE_SYSTEM_MESSAGE) {
-
         } else if (protocol === Protocol.LEAVE_CONNECTOR) {
             // stop interpreting messages from this client
             client.removeAllListeners('message');
             // prevent "onLeave" from being called twice in case the connection is forcibly closed
             client.removeAllListeners('close');
-
             // only effectively close connection when "onLeave" is fulfilled
             this._onLeave(client, WS_CLOSE_CONSENTED).then(() => client.close());
         } else if(protocol === Protocol.CLIENT_WEB_RTC_ENABLED) {
@@ -624,12 +687,11 @@ export abstract class Connector extends EventEmitter {
         if(this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
             this.relayChannel.send([Protocol.JOIN_CONNECTOR, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid])
         }
-
         client.on('message', this._onWebClientMessage.bind(this, client));
         client.once('close', this._onLeave.bind(this, client));
     }
 
-    private async _onLeave(client: Client, code?: number): Promise<any> {
+    private async _onLeave(client: IConnectorClient, code?: number): Promise<any> {
         // call abstract 'onLeave' method only if the client has been successfully accepted.
         if(this.relayChannel) {
             this.relayChannel.send([Protocol.LEAVE_CONNECTOR, client.playerIndex]);
