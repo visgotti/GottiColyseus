@@ -36,7 +36,7 @@ export interface GateConfig {
     gateURI: ServerURI,
     gamesData: Array<GameData>,
 }
-
+type GameDataLookup =  { [type: string]: {[id: string]: GameData } };
 export type ClientConnectorLookup = Map<string, number>;
 
 export class Gate {
@@ -58,7 +58,7 @@ export class Gate {
 
     readonly redisURI: string;
 
-    private availableGamesByType: { [type: string]: {[id: string]: GameData } } = {};
+    private availableGamesByType: GameDataLookup = {};
     private unavailableGamesById: { [id: string]: GameData } = {};
     private matchMakersByGameType: Map<string, any> = new Map();
 
@@ -160,9 +160,7 @@ export class Gate {
 
         try {
             this.pendingClients[tempId] = auth;
-
             let result = await this.connectorsByServerIndex[connectorServerIndex].reserveSeat({ auth, playerIndex, joinOptions: clientJoinOptions });
-
             if(result && result.gottiId) {
                 this.pendingClients.delete(tempId);
                 this.connectedClients.set(result.gottiId, connectorServerIndex);
@@ -183,7 +181,7 @@ export class Gate {
     }
 
     // TODO: refactor this and adding games
-    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number, proxyId: string }>, gameType, gameId, gameData: any, areaData: any) {
+    public addGame(connectorsData: Array<{serverIndex: number, host: string, port: number, proxyId: string }>, gameType, gameId, gameData: any, areaData: any, publicOptions?: any) {
 
         if(gameId in this.gamesById) {
             throw `gameId: ${gameId} is being added for a second time. The first reference was ${this.gamesById[gameId]}`
@@ -201,7 +199,8 @@ export class Gate {
             type: gameType,
             connectorsData: gameConnectorsData,
             areaData,
-            gameData
+            gameData,
+            publicOptions
         };
 
         if(!(gameType in this.availableGamesByType)) {
@@ -353,13 +352,14 @@ export class Gate {
         }
     }
 
-    public registerGateKeep(handler: (request, response) => any) {
+    public registerGateKeep(handler: (clientOptions: any, availableGames: GameDataLookup, auth: any, req) => any) {
         this.onGateKeepHandler = handler;
         this.onGateKeepHandler = this.onGateKeepHandler.bind(this);
     }
 
-    private onGateKeepHandler(availableGames, auth, clientOptions, req) : any {
+    private onGateKeepHandler(clientOptions: any, availableGames: GameDataLookup, auth: any, req) : any {
         console.warn('Currently always returning true for your gateKeep function, please specify a gateKeep(req,res) handler in Gate.js for custom gate keeping.')
+        console.log('returning', availableGames)
         return availableGames
     }
 
@@ -554,13 +554,31 @@ export class Gate {
         return this.connectorsByServerIndex[serverIndex].gameId;
     }
 
+    public close() {
+        this.disconnect();
+    }
     private disconnect() {
-        if(this.requester) {
-            this.requester.close();
-            this.requestBroker.close();
+        if(this.heartbeat) {
+            this.stopConnectorHeartbeat();
         }
-        if(this.responder) {
-            this.responder.close();
+        try {
+            if(this.requester) {
+                this.requester.close();
+            }
+        } catch (e) {
+            console.error('Error when closing requester:', e)
+        }
+        try {
+            if(this.requestBroker) {
+                this.requestBroker.close();
+            }
+        } catch (e) {
+            console.error('Error when closing requestBroker:', e)
+        }
+        try {
+            this.responder && this.responder.close();
+        }  catch (e) {
+            console.error('Error when closing responder:', e)
         }
     }
 }

@@ -27,22 +27,31 @@ import { Messenger as Responder } from 'gotti-reqres/dist';
 import { Messenger as Subscriber } from 'gotti-pubsub/dist';
 
 import {FrontMaster, Client as ChannelClient, FrontChannel} from 'gotti-channels/dist';
-import { decode, Protocol, GateProtocol, GOTTI_RELAY_CHANNEL_ID, send, WS_CLOSE_CONSENTED, GOTTI_MASTER_CHANNEL_ID  } from './Protocol';
+import {
+    decode,
+    Protocol,
+    GateProtocol,
+    GOTTI_RELAY_CHANNEL_ID,
+    send,
+    WS_CLOSE_CONSENTED,
+    GOTTI_MASTER_CHANNEL_ID,
+} from './Protocol';
 
 import * as fossilDelta from 'fossil-delta';
 
 const nanoid = require('nanoid');
 
-import nodeDataChannel, {PeerConnection} from 'node-datachannel'
-
+import {IceServer, PeerConnection, ProxyServer, RtcConfig} from 'node-datachannel'
 
 import { EventEmitter } from 'events';
 
 import {ConnectorClient, ConnectorClient as Client} from './ConnectorClient';
 import {setInterval} from "timers";
 import {IConnectorClient} from "./ConnectorClients/IConnectorClient";
-import {WebRTCConnectorClient } from "./ConnectorClients/WebRTC";
+import {SdpSignal, WebRTCConnectorClient} from "./ConnectorClients/WebRTC";
 import {WebSocketConnectorClient} from "./ConnectorClients/WebSocket"
+import {WebRTCConnection} from "gotti/lib/core/WebClient/ConnectorServerConnections";
+import Timeout = NodeJS.Timeout;
 //import { debugAndPrintError, debugPatch, debugPatchData } from '../../colyseus/lib/Debug';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
@@ -55,15 +64,18 @@ const DEFAULT_RELAY_RATE = 1000 / 30; // 30fpS
 export type SimulationCallback = (deltaTime?: number) => void;
 
 export type ServerURI = {
-    private: string,
+    private?: string,
     public: string,
 }
 
 export type ConnectorOptions = IServerOptions & {
     pingTimeout?: number,
+    disableWebRTCClients?: number,
+    maxWebRTCConnections?: number,
     gracefullyShutdown?: boolean,
     server: string,
     port?: number,
+    webRtcPort?: number,
     messageRelayRate?: number,
     serverIndex: number,
     connectorURI: ServerURI,
@@ -86,12 +98,10 @@ export interface BroadcastOptions {
 }
 
 export abstract class Connector extends EventEmitter {
-    private candidates : Array< {candidate: string, mid: string }> = [];
     protected httpServer: any;
-
     private relayChannel?: FrontChannel;
     private masterServerChannel?: FrontChannel;
-
+    private webRTCConnections : Array<WebRTCConnectorClient> = [];
     private peerConnections: {[id: string]: { peer: PeerConnection, server: PeerConnection }};
 
     private awaitingWebRTCConnections : {[id: string]: WebRTCConnectorClient } = {}
@@ -114,21 +124,26 @@ export abstract class Connector extends EventEmitter {
     public autoDispose: boolean = true;
     public state: any;
     public metadata: any = null;
-
+    public currentWebRTCConnections : number = 0;
     public masterChannel: FrontMaster = null;
     public privateMasterChannel : FrontMaster = null;
     public channels: any;
 
+    private ackInterval?: Timeout = null;
+
     public clients: IConnectorClient[] = [];
     public clientsById: {[gottiId: string]: IConnectorClient} = {};
-
+    private webRTCConfig : RtcConfig;
     private _patchInterval: NodeJS.Timer;
     private _relayMessageTimeout: NodeJS.Timer;
-
+    private maxWebRTCConnections : number = -1;
     private websocketServer: any;
     private gateURI: ServerURI;
     private masterServerURI: ServerURI;
     private relayURI: ServerURI;
+
+    private nextAckClientIndex : number;
+    private ackIntervalRate : number = 25;
 
     private responder: Responder;
     private serverWebRtcConnection;
@@ -136,7 +151,6 @@ export abstract class Connector extends EventEmitter {
     private reservedSeats: {[clientId: string]: any} = {};
 
     private messageRelayRate: number; // 20 fps
-
     constructor(options: ConnectorOptions) {
         super();
         this.masterServerURI = options.masterServerURI;
@@ -151,10 +165,15 @@ export abstract class Connector extends EventEmitter {
         this.options = options;
         this.options.port = this.port;
 
+        if(options.disableWebRTCClients) {
+            this.maxWebRTCConnections = 0;
+        } else {
+            this.maxWebRTCConnections = 'maxWebRTCConnections' in options ? options.maxWebRTCConnections : -1;
+        }
+
         if(this.options.gameData) {
             this.gameData = this.options.gameData
         }
-
         if(options.server === 'http') {
             this.httpServer = http.createServer();
             this.options.server = this.httpServer;
@@ -163,14 +182,29 @@ export abstract class Connector extends EventEmitter {
             throw 'please use http or net as server option'
         }
 
+        this.webRTCConfig = {
+            iceServers: [
+                'stun:stun1.l.google.com:19302',
+                'stun:stun2.l.google.com:19302',
+                'stun:stun3.l.google.com:19302',
+                'stun:stun4.l.google.com:19302'
+            ],
+            portRangeBegin: 7100,
+            portRangeEnd: 7500
+        }
+
+        this.createResponder(options.gateURI.public);
+        this.registerGateResponders();
+        //this.setPatchRate(this.patchRate);
+    }
+
+
+    private createResponder(gateURI) {
         this.responder = new Responder({
             response: true,
             id: `${this.serverIndex}_responder`,
-            brokerURI: options.gateURI.public,
+            brokerURI: gateURI,
         });
-
-        this.registerGateResponders();
-        //this.setPatchRate(this.patchRate);
     }
 
     protected setMessageRelayRate(rate: number) {
@@ -192,20 +226,23 @@ export abstract class Connector extends EventEmitter {
         }, this.messageRelayRate)
     }
 
-    protected onWebSocketConnection = (client: IConnectorClient, req: http.IncomingMessage & any) => {
+    protected onWebSocketConnection (client: WebSocket, req: http.IncomingMessage & any) {
         client.pingCount = 0;
         const upgradeReq = req || client.upgradeReq;
         const url = parseURL(upgradeReq.url);
         const query = parseQueryString(url.query);
         req.gottiId = query.gottiId;
-
+        client.state = 'open';
         if(!(client) || !(req.gottiId) || !(this.reservedSeats[req.gottiId]) ) {
-            send(client, [Protocol.JOIN_CONNECTOR_ERROR])
+            send(client, Protocol.JOIN_CONNECTOR_ERROR, [Protocol.JOIN_CONNECTOR_ERROR])
         } else {
-            client.p2p_capable = query.isWebRTCSupported;
-            client.gottiId = req.gottiId;
-            client.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
-            this._onJoin(client, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].joinOptions);
+            const gottiClient = new WebSocketConnectorClient(client, new ChannelClient(req.gottiId, this.masterChannel));
+            gottiClient.p2p_capable = query.isWebRTCSupported;
+            gottiClient.gottiId = req.gottiId;
+            gottiClient.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
+            gottiClient.state = 'open';
+            gottiClient.pingCount = 0;
+            this._onJoin(gottiClient, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].joinOptions);
         }
 
         // prevent server crashes if a single client had unexpected error
@@ -256,7 +293,7 @@ export abstract class Connector extends EventEmitter {
         return new Promise((resolve, reject) => {
             setTimeout(() => {
                 this.masterChannel.connect().then((connection) => {
-                    this.areaData = connection.backChannelOptions;
+                    this.areaData = connection ? connection.backChannelOptions : {};
                     // connection backChannelOptions were made with area channels in mind.. so
                     // these frameworked channels keys should be deleted if theyre in.
                     delete this.areaData[GOTTI_RELAY_CHANNEL_ID];
@@ -265,7 +302,6 @@ export abstract class Connector extends EventEmitter {
                     this.registerChannelMessages();
                     this.websocketServer = new WebSocket.Server(this.options);
                     this.websocketServer.on('connection', this.onWebSocketConnection.bind(this));
-                    this.webRtcServer = new nodeDataChannel.PeerConnection("Peer1", { iceServers: ["stun:stun.l.google.com:19302"] });;
                     this.on('connection', this.onWebSocketConnection.bind(this)); // used for testing
                     this.startMessageRelay();
                     return resolve(true);
@@ -309,22 +345,28 @@ export abstract class Connector extends EventEmitter {
         return null;
     }
 
+    public async close() {
+        return this.disconnect(true);
+    }
+
     public async disconnect(closeHttp: boolean=true) : Promise<boolean> {
         this.stopMessageRelay();
         this.autoDispose = true;
-
         let i = this.clients.length;
         while (i--) {
             const client = this.clients[i];
             client.close(WS_CLOSE_CONSENTED);
         }
-        if(this.masterChannel) {
-            this.masterChannel.disconnect();
-        }
+        try {this.masterChannel && this.masterChannel.disconnect();
+        } catch(err){};
+        try{this.websocketServer.close();
+        }catch(err){};
+        try{this.responder.close();
+        }catch(err){};
 
         return new Promise((resolve, reject) => {
             if(closeHttp) {
-                this.httpServer.forceShutdown(() => {
+                this.httpServer.close(() => {
                     resolve(true);
                 });
             } else {
@@ -345,35 +387,53 @@ export abstract class Connector extends EventEmitter {
      */
     public abstract getInitialWriteArea(client: IConnectorClient, areaData, clientOptions?) : { areaId: string, options: any }
 
-    protected broadcast(data: any, options?: BroadcastOptions): boolean {
+    protected broadcast(data: any, options?: BroadcastOptions, reliable=false, ordered=false): boolean {
         // no data given, try to broadcast patched state
         if (!data) {
             throw new Error('Room#broadcast: \'data\' is required to broadcast.');
         }
-
+        let protocol = 1;
+        if(reliable) {
+            protocol+=5;
+        }
+        if(ordered) {
+            protocol+=12;
+        }
         let numClients = this.clients.length;
         while (numClients--) {
             const client = this.clients[ numClients ];
             if ((!options || options.except !== client)) {
-                send(client, data, false);
+                send(client, protocol, data, false);
             }
         }
+
         return true;
     }
 
     private registerClientAreaMessageHandling(client) {
         client.channelClient.onMessage((message) => {
-            if(message[0] === Protocol.SYSTEM_MESSAGE || message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
-                send(client, message);
-            } else if (message[0] === Protocol.ADD_CLIENT_AREA_LISTEN) {
+            const protocol = message[0];
+            if(
+                protocol === Protocol.SYSTEM_MESSAGE ||
+                protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE ||
+                Protocol.SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES ||
+                protocol === Protocol.SYSTEM_MESSAGE_RELIABLE_ORDERED ||
+                protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE_RELIABLE_ORDERED ||
+                Protocol.SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES_RELIABLE_ORDERED ||
+                protocol === Protocol.SYSTEM_MESSAGE_RELIABLE ||
+                protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE_RELIABLE ||
+                Protocol.SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES_RELIABLE
+            ) {
+                send(client, protocol, message);
+            } else if (protocol === Protocol.ADD_CLIENT_AREA_LISTEN) {
                 // message[1] areaId,
                 // message[2] options
                 this.addAreaListen(client, message[1], message[2]);
             }
-            else if (message[0] === Protocol.REMOVE_CLIENT_AREA_LISTEN) {
+            else if (protocol === Protocol.REMOVE_CLIENT_AREA_LISTEN) {
                 this.removeAreaListen(client, message[1], message[2]);
             }
-            else if(message[0] === Protocol.SET_CLIENT_AREA_WRITE) {
+            else if(protocol === Protocol.SET_CLIENT_AREA_WRITE) {
                 // the removeOldWriteListener will be false since that should be explicitly sent from the old area itself.
                 this.changeAreaWrite(client, message[1], message[2]);
             } else {
@@ -381,35 +441,41 @@ export abstract class Connector extends EventEmitter {
             }
         });
     }
-    private async startWebRtcConnection(client: WebSocketConnectorClient) : Promise<WebRTCConnectorClient> {
-        let configuration: nodeDataChannel.RtcConfig = {
-            // sdpSemantics: 'unified-plan',
-            // iceTransportPolicy: iceTransportPolicy,
-            iceServers: this.iceServers.map(ice => ice as string)
-        }
-
-        const peerConnection = new nodeDataChannel.PeerConnection(client.id as string, configuration);
-        const webRTCClient = new WebRTCConnectorClient(peerConnection, client.channelClient);
-
-        this.awaitingWebRTCConnections[client.gottiId] = WebRTCClient;
-
+    private async initiateWebRtcConnection(client: WebSocketConnectorClient) : Promise<WebRTCConnectorClient> {
+        const webRTCClient = new WebRTCConnectorClient(client.gottiId, this.webRTCConfig);
+        let fulfilled = false;
+        this.awaitingWebRTCConnections[client.gottiId] = webRTCClient;
+        this.currentWebRTCConnections++;
+        webRTCClient.on('added-signal', (signal) => {
+            console.log('send')
+            const stillCollecting = this.clientsById[client.gottiId] === client;
+            stillCollecting && send(client, Protocol.SERVER_WEBRTC_CANDIDATE,[Protocol.SERVER_WEBRTC_CANDIDATE, signal])
+        });
+        webRTCClient.once('opened-channel', () => {
+            this.handleFinishSuccesfulWebSocketToWebRTCClient(client, webRTCClient);
+        });
         return new Promise((resolve, reject) => {
-            webRTCClient.once('finished', (success: boolean) => {
-                if(!(this.awaitingWebRTCConnections[client.gottiId])) return;
-                delete this.awaitingWebRTCConnections[client.gottiId];
-                if(success) {
-                    this.handleFinishSuccesfulWebSocketToWebRTCClient(client, webRTCClient);
-                    return resolve()
-                } else {
-                    this.handleFinishFailedWebSocketToWebRTCClient(client, webRTCClient);
+            webRTCClient.on('disconnected', (reason: string) => {
+                this.handleDirtyWebRTCDisconnect(webRTCClient);
+            });
+            webRTCClient.on('failed-to-connect', (reason: string) => {
+                if(fulfilled) return;
+                fulfilled = true;
+                this.currentWebRTCConnections--;
+                return resolve(null);
+            });
+            webRTCClient.once('initial-sdp', (sdp : SdpSignal) => {
+                if(fulfilled) return;
+                fulfilled = true;
+                const stillCollecting = this.clientsById[client.gottiId] === client;
+                if(!stillCollecting) {
                     return resolve(null);
+                } else {
+                    send(client, Protocol.INITIATE_CHANGE_TO_WEBRTC, [Protocol.INITIATE_CHANGE_TO_WEBRTC, sdp.sdp]);
+                    return resolve(webRTCClient);
                 }
             });
         });
-
-        peerConnection.onDataChannel(cb => {
-        });
-        return null;
     }
 
     // iterates through all the channels the connector
@@ -459,7 +525,7 @@ export abstract class Connector extends EventEmitter {
                 const client = this.clientsById[message[1]];
                 if(client) {
                     client.p2p_enabled = true;
-                    send(this.clientsById[message[1]], [Protocol.ENABLED_CLIENT_P2P_SUCCESS]);
+                    send(this.clientsById[message[1]], Protocol.ENABLED_CLIENT_P2P_SUCCESS, [Protocol.ENABLED_CLIENT_P2P_SUCCESS]);
                 }
             } else if(protocol === Protocol.SIGNAL_SUCCESS) {
                 //[Protocol.SIGNAL_SUCCESS, fromPlayerIndex,  fromPlayerSignalData, toPlayerrGottiId], toPlayerData.connectorId)
@@ -467,14 +533,14 @@ export abstract class Connector extends EventEmitter {
                 // sends the sdp and ice to other client of client
                 if(toClient) {
                     // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
-                    send(toClient, [protocol, message[1], message[2]]);
+                    send(toClient, protocol, [protocol, message[1], message[2]]);
                 }
             } else if (protocol === Protocol.SIGNAL_FAILED) {
                 // [protocol, fromPlayerIndex, toPlayerGottiId, options])
                 const toClient = this.clientsById[message[2]];
                 if(toClient) {
                     // [protocol, fromPlayerIndex, options?]
-                    send(toClient, [protocol, message[1], message[2]]);
+                    send(toClient, protocol,[protocol, message[1], message[2]]);
                 }
             }
             else if(protocol === Protocol.PEER_CONNECTION_REQUEST) {
@@ -482,13 +548,13 @@ export abstract class Connector extends EventEmitter {
                 const toClient = this.clientsById[message[5]];
                 if(toClient) {
                     // [protocol, fromPlayerIndex, fromPlayerSignalData, from system name, request options]
-                    send(toClient, [protocol, message[1], message[2], message[3], message[4]])
+                    send(toClient, protocol, [protocol, message[1], message[2], message[3], message[4]])
                 }
             } if(protocol === Protocol.PEER_REMOTE_SYSTEM_MESSAGE) {
                 //Protocol.PEER_REMOTE_SYSTEM_MESSAGE, toGottiId, fromPlayerIndex, message.type, message.data, message.to]);
                 const toClient = this.clientsById[message[1]];
                 if(toClient) {
-                    send(toClient, [protocol, message[2], message[3], message[4], message[5]])
+                    send(toClient, protocol, [protocol, message[2], message[3], message[4], message[5]])
                 }
             }
         });
@@ -496,16 +562,41 @@ export abstract class Connector extends EventEmitter {
 
     private registerAreaMessages(areaChannel: FrontChannel) {
         areaChannel.onMessage((message) => {
-            if(message[0] === Protocol.SYSTEM_MESSAGE || message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
+            const protocol = message[0];
+            if(
+                protocol === Protocol.SYSTEM_MESSAGE ||
+                protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE ||
+                protocol === Protocol.SYSTEM_MESSAGE_RELIABLE_ORDERED ||
+                protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE_RELIABLE_ORDERED ||
+                protocol === Protocol.SYSTEM_MESSAGE_RELIABLE ||
+                protocol === Protocol.IMMEDIATE_SYSTEM_MESSAGE_RELIABLE
+            ) {
                 // add from area id
                 // get all listening clients for area/channel
                 const listeningClientUids = areaChannel.listeningClientUids;
                 let numClients = listeningClientUids.length;
                 // iterate through all and relay message
-                message = msgpack.encode(message);
-                while (numClients--) {
-                    const client = this.clientsById[ listeningClientUids[numClients] ];
-                    send(client, message, false);
+                if(protocol < 6) {
+                    message = msgpack.encode(message);
+                    while (numClients--) {
+                        const client = this.clientsById[listeningClientUids[numClients]];
+                        send(client, protocol, message, false);
+                    }
+                } else {
+                    while (numClients--) {
+                        const client = this.clientsById[listeningClientUids[numClients]];
+                        send(client, protocol, message);
+                    }
+                }
+            } else if (
+                protocol === Protocol.SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES_RELIABLE ||
+                protocol === Protocol.SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES ||
+                protocol === Protocol.SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES_RELIABLE_ORDERED
+            ) {
+                const clientIds = message.slice(2);
+                for(let i = 0; i < clientIds.length; i++) {
+                    const client = this.clientsById[ clientIds[i]];
+                    client && send(client, protocol, message[1], false);
                 }
             } else if (message[0] === Protocol.AREA_TO_AREA_SYSTEM_MESSAGE) {
                 // [protocol, type, data, to, from, areaIds]
@@ -515,13 +606,6 @@ export abstract class Connector extends EventEmitter {
                 areaChannel.broadcast(message, toAreaIds)
             } else if(message[0] === Protocol.AREA_TO_MASTER_MESSAGE) {
                 this.masterServerChannel.send([Protocol.AREA_TO_MASTER_MESSAGE, areaChannel.channelId, message[1]])
-            } else if (message[0] === Protocol.SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES) {
-                // [protocol, encodedmessage, ...clientIds]
-                const clientIds = message.slice(2);
-                for(let i = 0; i < clientIds.length; i++) {
-                    const client = this.clientsById[ clientIds[i]];
-                    client && send(client, message[1], false);
-                }
             }
         });
     }
@@ -530,7 +614,7 @@ export abstract class Connector extends EventEmitter {
     private async _getInitialWriteArea(client, clientOptions?: any) : Promise<boolean> {
         const oldAreaId = client.channelClient.processorChannel;
         if(oldAreaId) {
-            send(client, Protocol.WRITE_AREA_ERROR);
+            send(client, Protocol.WRITE_AREA_ERROR, Protocol.WRITE_AREA_ERROR);
             return false;
         }
         const write = this.getInitialWriteArea(client, this.areaData, clientOptions);
@@ -539,12 +623,14 @@ export abstract class Connector extends EventEmitter {
             await this.changeAreaWrite(client, write.areaId, write.options);
             return true;
         } else {
-            send(client, Protocol.WRITE_AREA_ERROR);
+            send(client, Protocol.WRITE_AREA_ERROR, Protocol.WRITE_AREA_ERROR);
             return false;
         }
     }
 
+
     private transferClientData(oldClient:IConnectorClient, newClient: IConnectorClient) {
+        newClient.channelClient = oldClient.channelClient;
         newClient.gottiId = oldClient.gottiId;
         newClient.playerIndex = oldClient.playerIndex;
         newClient.state = oldClient.state;
@@ -556,29 +642,77 @@ export abstract class Connector extends EventEmitter {
         newClient.p2p_enabled = oldClient.p2p_enabled;
     }
 
-    private handleFinishSuccesfulWebSocketToWebRTCClient(webSocketClient: WebSocketConnectorClient, webRtcClient: WebRTCConnectorClient) : WebRTCConnectorClient {
-        const index = this.clients.indexOf(webSocketClient);
-        webSocketClient.close();
-        if(index > -1) {
-            // todo: gracefully disconnect the websocket.
-            this.clients[index] = webRtcClient;
-            this.clientsById[webSocketClient.gottiId] = webRtcClient;
-        } else {
-            throw new Error(`Websocket client was not found.`)
+    private handleDirtyWebRTCDisconnect(client: WebRTCConnectorClient) {
+        const idx = this.webRTCConnections.indexOf(client);
+        if(idx < 0) throw new Error(`Expected to find.`);
+        this.webRTCConnections.splice(idx);
+        this.currentWebRTCConnections--;
+        if(!this.currentWebRTCConnections) {
+            if(this.webRTCConnections.length) throw new Error(`Length should be 0.`)
+            this.stopAckInterval();
         }
-        this.transferClientData(webSocketClient, webRtcClient);
-        return webRtcClient;
+        this._reserveSeat(client.gottiId, client.playerIndex, client.auth, client.joinOptions, 3000);
     }
 
-
-    private _onWebClientMessage(client: IConnectorClient, message: any) {
-        let decoded = decode(message);
-        if (!decoded) {
-        //    debugAndPrintError(`${this.roomName} (${this.roomId}), couldn't decode message: ${message}`);
-            return;
+    private handleFinishSuccesfulWebSocketToWebRTCClient(webSocketClient: WebSocketConnectorClient, webRtcClient: WebRTCConnectorClient) : WebRTCConnectorClient {
+        const index = this.clients.indexOf(webSocketClient);
+        if(index < 0 || this.awaitingWebRTCConnections[webSocketClient.gottiId] !== webRtcClient) {
+            throw new Error(`Websocket client was not found.`)
         }
-        const protocol = decoded[0];
+        webSocketClient.closingForWebRTC = true;
+        delete this.awaitingWebRTCConnections[webSocketClient.gottiId];
+        // todo: gracefully disconnect the websocket.
+        this.clients[index] = webRtcClient;
+        this.clientsById[webSocketClient.gottiId] = webRtcClient;
+        this.webRTCConnections.push(webRtcClient);
+        this.transferClientData(webSocketClient, webRtcClient);
+        webSocketClient.close();
+        webRtcClient.on('message', this._onWebClientMessage.bind(this, webRtcClient));
+        webRtcClient.removeAllListeners('opened-channel');
+        webRtcClient.removeAllListeners('added-candidate');
+        this.emit('webrtc-connection',  webRtcClient)
+        if(!this.ackInterval) {
+            this.startAckInterval();
+        }
+        return webRtcClient;
+    }
+    private startAckInterval() {
+        this.nextAckClientIndex = 0;
+        this.ackInterval = setInterval(() => {
+            this.ackNextRoundRobin();
+        }, this.ackIntervalRate);
+    }
+    private stopAckInterval() {
+        if(this.ackInterval) {
+            clearInterval(this.ackInterval)
+        }
+        this.ackInterval = null;
+    }
 
+    private ackNextRoundRobin() : WebRTCConnectorClient {
+        let checked = 0;
+        if(this.nextAckClientIndex >= this.webRTCConnections.length) {
+            this.nextAckClientIndex = 0;
+        }
+        const totalLen = this.webRTCConnections.length;
+        let minSend = Math.min(Math.floor(totalLen/10), 1);
+        let sent = 0;
+        while(checked < totalLen && sent < minSend) {
+            const client = this.webRTCConnections[this.nextAckClientIndex++];
+            if(client.sendAcks()) {
+                return client;
+            } else {
+                if(this.nextAckClientIndex === this.webRTCConnections.length) {
+                    this.nextAckClientIndex = 0;
+                }
+                checked++;
+            }
+        }
+        return null;
+    }
+
+    private _onWebClientMessage(client: IConnectorClient, decoded: Array<any>) {
+        const protocol = decoded[0];
         if (protocol === Protocol.SYSTEM_MESSAGE) {
             //TODO go into my channel lib and make it so you can send encoding as false so we can just forward the encoded message
             client.channelClient.sendLocal(decoded);
@@ -608,12 +742,19 @@ export abstract class Connector extends EventEmitter {
             this.relayChannel && this.relayChannel.send([Protocol.DISABLED_CLIENT_P2P, client.playerIndex]);
         } else if(protocol === Protocol.SIGNAL_REQUEST) {
                 // [protocol, toPlayerIndex, { sdp, candidate }
-            this.relayChannel && this.relayChannel.send([protocol, decoded[1], decoded[2], client.playerIndex, this.relayChannel.frontUid]);
+            const toPlayerIndex = decoded[1];
+            // server signal request
+            if(toPlayerIndex === -1) {
+                const awaitingWebRTC = this.awaitingWebRTCConnections[client.gottiId];
+                awaitingWebRTC && awaitingWebRTC.receivedRemoteSignal(decoded[2])
+            } else {
+                this.relayChannel && this.relayChannel.send([protocol, toPlayerIndex, decoded[2], client.playerIndex, this.relayChannel.frontUid]);
+            }
         } else if(protocol === Protocol.PEER_CONNECTION_REQUEST) {
             // protocol, toPlayerIndex, { sdp, candidate }, systemName, options
             this.relayChannel && this.relayChannel.send([protocol, decoded[1], decoded[2], decoded[3], decoded[4], client.playerIndex, this.relayChannel.frontUid]);
         } else if(protocol === Protocol.SIGNAL_FAILED) {
-            this.relayChannel && this.relayChannel.send([protocol, message[1], client.playerIndex]);
+            this.relayChannel && this.relayChannel.send([protocol, decoded[1], client.playerIndex]);
         }
     }
 
@@ -626,7 +767,7 @@ export abstract class Connector extends EventEmitter {
              will be added to the client's queue as 'PATCH' updates. */
            // this.sendState(client);
 
-            send(client, [Protocol.ADD_CLIENT_AREA_LISTEN, areaId, linkedResponse]);
+            send(client, Protocol.ADD_CLIENT_AREA_LISTEN, [Protocol.ADD_CLIENT_AREA_LISTEN, areaId, linkedResponse]);
 
             return true;
         } catch(err) {
@@ -651,7 +792,7 @@ export abstract class Connector extends EventEmitter {
         if(isLinked) {
             const success = client.channelClient.setProcessorChannel(newAreaId, false, writeOptions);
             if(success) {
-                send(client, [Protocol.SET_CLIENT_AREA_WRITE, newAreaId, writeOptions]);
+                send(client, Protocol.SET_CLIENT_AREA_WRITE, [Protocol.SET_CLIENT_AREA_WRITE, newAreaId, writeOptions]);
                 return true;
             }
         }
@@ -662,16 +803,14 @@ export abstract class Connector extends EventEmitter {
         if(!(this.masterChannel.frontChannels[areaId]))  { console.error('invalid areaId') }
 
         client.channelClient.unlinkChannel(areaId);
-
-        send(client, [Protocol.REMOVE_CLIENT_AREA_LISTEN, areaId, options]);
+        send(client, Protocol.REMOVE_CLIENT_AREA_LISTEN, [Protocol.REMOVE_CLIENT_AREA_LISTEN, areaId, options] );
     }
 
-    private _onJoin(client, auth: any, joinOptions: any) {
+    private _onJoin(client: WebSocketConnectorClient, auth: any, joinOptions: any) {
         // clear the timeout and remove the reserved seat since player joined
         clearTimeout(this.reservedSeats[client.gottiId].timeout);
         delete this.reservedSeats[client.gottiId];
         // add a channelClient to client
-        client.channelClient = new ChannelClient(client.gottiId, this.masterChannel);
         // register channel/area message handlers
         this.registerClientAreaMessageHandling(client);
         this.clients.push( client );
@@ -682,16 +821,27 @@ export abstract class Connector extends EventEmitter {
             client.joinedOptions = this.onJoin(client, this.changeAreaWrite.bind(this, client))
         }
         client.auth = auth;
-        send(client, [ Protocol.JOIN_CONNECTOR, client.joinedOptions ]);
-
+        send(client, Protocol.JOIN_CONNECTOR,[ Protocol.JOIN_CONNECTOR, client.joinedOptions ]);
         if(this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
             this.relayChannel.send([Protocol.JOIN_CONNECTOR, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid])
         }
-        client.on('message', this._onWebClientMessage.bind(this, client));
+        client.on('message', (message) => {
+            let decoded = decode(message);
+            if (!decoded) {
+                //    debugAndPrintError(`${this.roomName} (${this.roomId}), couldn't decode message: ${message}`);
+                return;
+            }
+            this._onWebClientMessage(client, decoded);
+        });
         client.once('close', this._onLeave.bind(this, client));
+        if(client.p2p_capable && (this.maxWebRTCConnections === -1 || this.currentWebRTCConnections < this.maxWebRTCConnections)) {
+            this.initiateWebRtcConnection(client);
+        }
     }
 
     private async _onLeave(client: IConnectorClient, code?: number): Promise<any> {
+        console.error('the client was', 'code', code)
+        if(client['closingForWebRTC']) return;
         // call abstract 'onLeave' method only if the client has been successfully accepted.
         if(this.relayChannel) {
             this.relayChannel.send([Protocol.LEAVE_CONNECTOR, client.playerIndex]);
@@ -717,14 +867,14 @@ export abstract class Connector extends EventEmitter {
      * @param joinOptions - additional data sent from the gate
      * @private
      */
-    private _reserveSeat(clientId, playerIndex, auth, joinOptions) {
+    private _reserveSeat(clientId, playerIndex, auth, joinOptions, timeout=10000) {
         this.reservedSeats[clientId] = {
             auth,
             playerIndex,
             joinOptions,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
-            }, 10000) // reserve seat for 10 seconds
+            }, timeout) // reserve seat for 10 seconds
         }
     }
 

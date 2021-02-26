@@ -9,46 +9,55 @@ export const WS_CLOSE_CONSENTED = 4000;
 
 
 export const enum Protocol {
-    // find connector related (1~9)
-    CONNECTOR_URI = 2,
-    CONNECTOR_URI_ERROR = 3,
+    // web client > front connector messages
+    // unreliable message types (0-5)
+    SYSTEM_MESSAGE = 0,
+    SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES=1,
+    IMMEDIATE_SYSTEM_MESSAGE = 2,
+    ACK_SYNC=3,
 
-        // connector-related (10~19)
-    JOIN_CONNECTOR = 10,
-    JOIN_CONNECTOR_ERROR = 11,
-    LEAVE_CONNECTOR = 12,
+    // reliable message types (6-11)
+    SYSTEM_MESSAGE_RELIABLE=6,
+    SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES_RELIABLE=7,
+    IMMEDIATE_SYSTEM_MESSAGE_RELIABLE=8,
 
-        // area-related 20-29
-
+    //reliable ordered message types (12+)
+    SYSTEM_MESSAGE_RELIABLE_ORDERED=12,
+    SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES_RELIABLE_ORDERED=13,
+    IMMEDIATE_SYSTEM_MESSAGE_RELIABLE_ORDERED=14,
+    // connector specific.
+    JOIN_CONNECTOR = 15,
+    JOIN_CONNECTOR_ERROR = 16,
+    LEAVE_CONNECTOR = 17,
+    INITIATE_CHANGE_TO_WEBRTC=18,
+    SERVER_WEBRTC_CANDIDATE=19,
     GET_INITIAL_CLIENT_AREA_WRITE = 20,
     SET_CLIENT_AREA_WRITE = 21,
     ADD_CLIENT_AREA_LISTEN = 22,
     REMOVE_CLIENT_AREA_LISTEN = 23,
     WRITE_AREA_ERROR = 24,
     LISTEN_AREA_ERROR = 25,
-
-    AREA_DATA = 26,
     AREA_STATE_UPDATE = 27,
-    SYSTEM_MESSAGE = 28,
-    SYSTEM_TO_MULTIPLE_CLIENT_MESSAGES,
-    ENCODED_SYSTEM_MESSAGE,
-    IMMEDIATE_SYSTEM_MESSAGE = 29,
+    AREA_DATA = 26,
 
-        //global messages 30 - 39
-    GLOBAL_DATA = 30,
-    GAME_STARTING = 31,
-    GAME_ENDING = 32,
+
+
+
+        // area-related 20-39
+
+        //global messages 40 - 49
+    GLOBAL_DATA = 40,
+    GAME_STARTING = 41,
+    GAME_ENDING = 42,
 
         // area to area communication
-    AREA_PUBLIC_OPTIONS = 33,
-    AREA_TO_AREA_SYSTEM_MESSAGE = 34,
-    AREA_TO_MASTER_MESSAGE = 35,
-    MASTER_TO_AREA_BROADCAST = 36,
-    GLOBAL_MASTER_MESSAGE = 37,
+    AREA_PUBLIC_OPTIONS = 43,
+    AREA_TO_AREA_SYSTEM_MESSAGE = 44,
+    AREA_TO_MASTER_MESSAGE = 45,
+    MASTER_TO_AREA_BROADCAST = 46,
+    GLOBAL_MASTER_MESSAGE = 47,
         // Generic messages (50~60)
     BAD_REQUEST = 50,
-
-    INITIATE_SERVER_WEBRTC_CONNECTION,
 
     // P2P/WEBRTC Codes
     CLIENT_WEB_RTC_ENABLED = 100,
@@ -138,8 +147,11 @@ export function decode(message: any) {
     return message;
 }
 
-export function send(client: IConnectorClient, message: any, encode: boolean = true) {
-    if (client.state === "open") {
-        client.send((encode && msgpack.encode(message)) || message);
+export function send(client: IConnectorClient, protocol: number, message: any, encode: boolean = true) {
+    if(client.state !== "open") return;
+    if(protocol < 6) {
+        client.send(encode && msgpack.encode(message) || message);
+    } else {
+        client.sendReliable(message, protocol > 11)
     }
 }

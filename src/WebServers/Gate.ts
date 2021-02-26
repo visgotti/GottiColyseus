@@ -83,4 +83,12 @@ export class GateWebServer extends BaseWebServer{
         this.app.post(`${GOTTI_HTTP_ROUTES.BASE_GATE}${GOTTI_HTTP_ROUTES.JOIN_GAME}`, this.gate.gameRequested.bind(this.gate));
         return true;
     }
+
+    close() {
+        try {
+            this.server && this.server.close();
+        } catch(err) {}
+        this.gate && this.gate.close();
+        this.gate = null;
+    }
 }

@@ -40,7 +40,7 @@ describe('Gate', () => {
 
     beforeEach('Creates Gate instance', (done) => {
         gate = null;
-        gate = new Gate(gateURI);
+        gate = new Gate({ public: gateURI, private: null });
         done();
     });
     afterEach((done) => {

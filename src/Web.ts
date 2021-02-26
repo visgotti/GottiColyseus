@@ -66,6 +66,23 @@ export class WebServer extends BaseWebServer {
         this.auth = new AuthWebServer(gateURI, this.port, this.app, authSessionTimeout);
     }
 
+
+    public close() {
+        if(this.auth) {
+            this.auth.close();
+        }
+        if(this.gate) {
+            this.gate.close();
+        }
+        if(this.server) {
+            try {
+                this.server.close();
+            } catch(err) {
+                console.error(err);
+            }
+        }
+    }
+
     public async hostGate(gateURI: ServerURI) {
         this.gate = new GateWebServer(gateURI);
         return this.gate.init(this.app);

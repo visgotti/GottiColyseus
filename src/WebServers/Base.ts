@@ -3,4 +3,5 @@ export abstract class BaseWebServer {
     public app: any;
     constructor() {};
     abstract addHandler(route: string, handler: Function);
+    abstract close(reason?: string);
 }

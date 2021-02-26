@@ -1,4 +1,5 @@
-import { Connector } from  'gotti-servers/dist';
+import { Connector } from  '../../../src/Connector';
+import {IConnectorClient} from "../../../src/ConnectorClients/IConnectorClient";
 
 export class GameConnector extends Connector {
     constructor(options) {
@@ -10,10 +11,13 @@ export class GameConnector extends Connector {
         return { "foo": "bar" };
     }
     getInitialArea(client, auth, clientOptions) {
-        console.log('running get initial area and client was', client);
         return {
             areaId: 'mock1',
             options: { x: 500, y: 500 },
         };
+    }
+
+    getInitialWriteArea(client: IConnectorClient, areaData, clientOptions?): { areaId: string; options: any } {
+        return {areaId: "", options: undefined};
     }
 }

@@ -31,6 +31,15 @@ export class Proxy {
             this.connectorProxies[`${GOTTI_HTTP_ROUTES.CONNECTOR}/${proxyId}`] = `${wsProtocol}://${host}:${port}`;
         });
     }
+    close() {
+        if(this.server) {
+            try {
+                this.server.close();
+            } catch(err) {
+                console.error(err);
+            }
+        }
+    }
     private getContentHostRoundRobin() {
         if(this.currentWebContentIdx === this.webUrls.length) this.currentWebContentIdx = 0;
         return this.webUrls[this.currentWebContentIdx++];
@@ -41,6 +50,9 @@ export class Proxy {
     }
     public async init() {
         this.app.use(helmet());
+        if(this.authUrl) {
+            console.log('using auth url', this.authUrl, 'for route', `${GOTTI_HTTP_ROUTES.BASE_AUTH}`);
+        }
         this.authUrl && this.app.use(`${GOTTI_HTTP_ROUTES.BASE_AUTH}`, proxy({ target: this.authUrl }));
         this.gateUrl && this.app.use(`${GOTTI_HTTP_ROUTES.BASE_GATE}`, proxy({ target: this.gateUrl }));
         this.app.use(`${GOTTI_HTTP_ROUTES.BASE_PUBLIC_API}`, proxy({

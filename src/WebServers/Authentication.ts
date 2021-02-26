@@ -262,6 +262,14 @@ class AuthenticationBase extends BaseWebServer {
             }, timeout)
         })
     }
+
+    public close() {
+        try {this.server && this.server.close();
+        } catch(err) {}
+        if(this.requester) {
+            this.requester.close()
+        }
+    }
 }
 const Authentication = MasterServerListener(AuthenticationBase);
 export default Authentication;

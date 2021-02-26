@@ -6,14 +6,29 @@ import { generateId } from '../src/Util';
 import * as WebSocket from 'ws';
 import { EventEmitter } from 'events';
 const msgpack = require('notepack.io');
+export const LOCAL_HOST  = '127.0.0.1';
 
+export const GATE_SERVER_PORT = 5050;
+export const GATE_CLIENT_PORT = 5060;
+
+export const AUTH_PORT = 7070;
+export const CONNECTOR_SERVER_PORT = 4080;
+export const CONNECTOR_CLIENT_PORT = 8080;
 
 /*
 export class DummyArea extends Area {
 
 }
 */
+export const makeURI = (__port) => {
+    return {
+        public: `inproc://${LOCAL_HOST}:${__port}`
+    }
+}
 
+export const makeURL = (__port) => {
+    return `http://${LOCAL_HOST}:${__port}`
+}
 
 export class Client extends EventEmitter {
 
