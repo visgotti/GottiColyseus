@@ -2,7 +2,8 @@ import {IConnectorClient} from "./IConnectorClient";
 import {Client} from "gotti-channels/dist";
 import {EventEmitter} from "events";
 import {DataChannel, DescriptionType, RtcConfig, PeerConnection} from "node-datachannel";
-import {Protocol} from "../Protocol";
+import {MAX_ACK_SEQ, Protocol} from "../Protocol";
+import * as assert from "assert";
 const nodeDataChannel = require('node-datachannel');
 
 type Signal = CandidateSignal | SdpSignal
@@ -20,7 +21,7 @@ export type SdpSignal = {
 type ReliableBufferLookup = {
     [seq: number]: {
         timeout: any,
-        message: Buffer
+        message?: Buffer
     }
 }
 const msgpack = require('notepack.io');
@@ -36,7 +37,7 @@ export class WebRTCConnectorClient extends EventEmitter implements IConnectorCli
     private collectedSignals: Array<Signal> = [];
     private bufferedCandidates : Array<CandidateSignal> = [];
     private connected : boolean = false;
-    private dataChannel : DataChannel;
+    public dataChannel : DataChannel;
     private sentReliableAckSequences : Array<number> = [];
     private sentOrderedAckSequences : Array<number> = [];
 
@@ -53,20 +54,34 @@ export class WebRTCConnectorClient extends EventEmitter implements IConnectorCli
     private receivedOutOfOrderSeq: Array<{ seq: number, message: any }> = [];
 
     private lastAckSequenceNumber : number = 0;
-    private lastAckOrderedSequenceNumber : number = 0;
     private orderedReliableBuffer : ReliableBufferLookup = {};
-    private reliableBuffer : ReliableBufferLookup = {} ;
+    private reliableBuffer : ReliableBufferLookup = {};
     private alreadyProcessedReliableSeqs : {[number: string]: any } = {};
     private lowestUnorderedSeqProcessed: number = 0;
 
     public hasAcks : boolean = false;
+
+    private closeReason : string = '';
+    private emittedClose : boolean = false;
 
     constructor(gottiId: string, config: RtcConfig) {
         super();
         this.gottiId = gottiId;
         this.peerConnection = new nodeDataChannel.PeerConnection(gottiId, config);
         this.peerConnection.onStateChange(state => {
-            console.log('state:', state);
+            const wasClosingState = state === 'closed' || state === 'disconnected';
+            if(wasClosingState) {
+                if(this.state === "open") {
+                    this.close();
+                }
+                if(!this.emittedClose) {
+                    this.emittedClose = true;
+                    this.emit('closed-channel', this.closeReason);
+                    this.removeAllListeners();
+                    this.peerConnection = null;
+                    nodeDataChannel.cleanup();
+                }
+            }
         })
         this.peerConnection.onGatheringStateChange(state => {
             console.log('gathering state:', state)
@@ -77,25 +92,23 @@ export class WebRTCConnectorClient extends EventEmitter implements IConnectorCli
         this.peerConnection.onLocalCandidate((candidate: string, mid: string) => {
             this.addCandidate( { candidate, mid });
         });
-
         this.dataChannel = this.peerConnection.createDataChannel('gotticonnector', {
             negotiated: false,
-            protocol: "udp",
+            protocol: "UDP",
             reliability: {rexmit: 0, type: 2, unordered: true},
         });
-
         this.dataChannel.onOpen(() => {
             this.connected = true;
             this.state = 'open';
             this.emit('opened-channel', this.dataChannel);
         });
-        this.dataChannel.onClosed(() => {
-            this.emit('closed-channel', 'closed');
-        });
         this.dataChannel.onMessage(this._onMessage.bind(this));
     }
     channelClient: Client;
-    close(reason: number | undefined): void {
+    close(reason?: string): void {
+        if(reason) {
+            this.closeReason = reason;
+        }
         this.state = 'closed';
         this.enqueued = null;
         Object.keys(this.reliableBuffer).forEach(k => {
@@ -106,9 +119,11 @@ export class WebRTCConnectorClient extends EventEmitter implements IConnectorCli
         });
         this.reliableBuffer = {};
         this.orderedReliableBuffer = {};
-        try {
+        if(this.dataChannel) {
             this.dataChannel.close();
-        } catch(err) {
+            this.dataChannel = null;
+        } else {
+            this.peerConnection.close();
         }
     }
     public sendReliable(message: Array<any>, ordered=false, opts?: { retryRate?: number, firstRetryRate?: number } ) {
@@ -121,11 +136,11 @@ export class WebRTCConnectorClient extends EventEmitter implements IConnectorCli
         opts = opts || {};
         let lookup : ReliableBufferLookup;
         if(ordered) {
-            if(++this.nextOrderedSequenceNumber >= 65535) { this.nextOrderedSequenceNumber = 1; }
+            if(++this.nextOrderedSequenceNumber === MAX_ACK_SEQ) { this.nextOrderedSequenceNumber = 1; }
             seq = this.nextOrderedSequenceNumber;
             lookup = this.orderedReliableBuffer;
         } else {
-            if(++this.nextSequenceNumber >= 65535) { this.nextSequenceNumber = 1;}
+            if(++this.nextSequenceNumber === MAX_ACK_SEQ) { this.nextSequenceNumber = 1;}
             seq = this.nextSequenceNumber;
             lookup = this.reliableBuffer;
         }
@@ -142,9 +157,9 @@ export class WebRTCConnectorClient extends EventEmitter implements IConnectorCli
 
     private _sendReliable(message: Buffer, lookup: ReliableBufferLookup, seq: number, retry: number, opts?: { retryRate?: number, firstRetryRate?: number }) {
         opts = opts || {};
-        const retryRate = opts.retryRate || 5;
+        const retryRate = opts.retryRate || 50;
         if(retry === 0) {
-            const firstRetryRate = opts.firstRetryRate || retryRate;
+            const firstRetryRate = opts.firstRetryRate || 15;
             lookup[seq] = {
                 message,
                 timeout: setTimeout(() => {
@@ -210,36 +225,53 @@ export class WebRTCConnectorClient extends EventEmitter implements IConnectorCli
                 if(seq > this.lowestUnorderedSeqProcessed && !this.alreadyProcessedReliableSeqs[seq]) {
                     this.alreadyProcessedReliableSeqs[seq] = true;
                     this.emit('message', decoded);
-                    while(this.alreadyProcessedReliableSeqs[this.lowestUnorderedSeqProcessed+1]) {
-                        delete this.alreadyProcessedReliableSeqs[++this.lowestUnorderedSeqProcessed]
+                    let next = this.lowestUnorderedSeqProcessed+1 === MAX_ACK_SEQ ? 1 : this.lowestUnorderedSeqProcessed+1;
+                    while(this.alreadyProcessedReliableSeqs[next]) {
+                        delete this.alreadyProcessedReliableSeqs[next];
+                        this.lowestUnorderedSeqProcessed = next;
+                        next = next+1 === MAX_ACK_SEQ ? 1 :next+1
                     }
                 }
             } else { // 12 is max reliable ordered protocol
+                let isResetSeq = seq < 1500 && this.lastAckSequenceNumber > MAX_ACK_SEQ-1500;
                 !this.sentOrderedAckSequences.includes(seq) && this.sentOrderedAckSequences.push(seq);
-
                 // todo: check if we went over the 65535 max meaning the seq reset.
-                if(seq <= this.lastAckSequenceNumber) return;
-
+                if(seq <= this.lastAckSequenceNumber && !isResetSeq) return;
                 // we received the next needed ack sequence.
+
                 if(this.lastAckSequenceNumber === seq-1) {
-                    this.lastAckSequenceNumber = seq;
                     this.emit('message', decoded);
+                    ++this.lastAckSequenceNumber
+                    if(this.lastAckSequenceNumber+1=== MAX_ACK_SEQ) {
+                        this.lastAckSequenceNumber = 0;
+                        this.receivedOutOfOrderSeq.forEach(s => s.seq-=MAX_ACK_SEQ);
+                    }
                     // do callback for all sequences we already received.
-                    while(this.receivedOutOfOrderSeq.length && this.receivedOutOfOrderSeq[0].seq === this.lastAckSequenceNumber+1) {
-                        this.emit('message', this.receivedOutOfOrderSeq.shift().message);
-                        this.lastAckSequenceNumber++;
+                    while(this.receivedOutOfOrderSeq.length) {
+                        if(this.receivedOutOfOrderSeq[0].seq === this.lastAckSequenceNumber+1) {
+                            this.emit('message', this.receivedOutOfOrderSeq.shift().message);
+                            this.lastAckSequenceNumber++;
+                            if(this.lastAckSequenceNumber+1 === MAX_ACK_SEQ) {
+                                this.receivedOutOfOrderSeq.forEach(s => s.seq-=MAX_ACK_SEQ);
+                                this.lastAckSequenceNumber = 0;
+                            }
+                        } else {
+                            return;
+                        }
                     }
                 } else {
                     let insertedAt = -1;
+                    const adjustedSeq = isResetSeq ? seq + MAX_ACK_SEQ : seq;
                     for(let i = 0; i < this.receivedOutOfOrderSeq.length; i++) {
-                        if(seq < this.receivedOutOfOrderSeq[i].seq) {
-                            insertedAt = i;
-                            this.receivedOutOfOrderSeq.splice(i, 0, { seq, message: decoded });
+                        if(adjustedSeq === this.receivedOutOfOrderSeq[i].seq) return;
+                        if(adjustedSeq < this.receivedOutOfOrderSeq[i].seq) {
+                            insertedAt = i ;
+                            this.receivedOutOfOrderSeq.splice(i, 0, { seq: adjustedSeq , message: decoded });
                             break;
                         }
                     }
                     if(insertedAt < 0) {
-                        this.receivedOutOfOrderSeq.push({ seq, message: decoded })
+                        this.receivedOutOfOrderSeq.push({ seq: adjustedSeq, message: decoded })
                     }
                 }
                 return;

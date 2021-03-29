@@ -9,49 +9,49 @@
  *  modified to fit GottiColyseus by -
  *  https://github.com/visgotti
  ***************************************************************************************/
-import has = Reflect.has;
+import Timeout = NodeJS.Timeout;
 
 const msgpack = require('notepack.io');
 
 import * as net from 'net';
 import * as http from 'http';
-
-import { merge, spliceOne, generateId, parseQueryString } from './Util';
+import {generateId, parseQueryString, spliceOne} from './Util';
 
 import * as parseURL from 'url-parse';
 
 import * as WebSocket from 'ws';
-import { ServerOptions as IServerOptions } from 'ws';
+import {ServerOptions as IServerOptions} from 'ws';
 
-import { Messenger as Responder } from 'gotti-reqres/dist';
-import { Messenger as Subscriber } from 'gotti-pubsub/dist';
+import {Messenger as Responder} from 'gotti-reqres/dist';
 
-import {FrontMaster, Client as ChannelClient, FrontChannel} from 'gotti-channels/dist';
+import {Client as ChannelClient, FrontChannel, FrontMaster} from 'gotti-channels/dist';
 import {
     decode,
-    Protocol,
     GateProtocol,
+    GOTTI_MASTER_CHANNEL_ID,
     GOTTI_RELAY_CHANNEL_ID,
+    Protocol,
+    ReservedSeatType,
     send,
     WS_CLOSE_CONSENTED,
-    GOTTI_MASTER_CHANNEL_ID,
 } from './Protocol';
+import {PeerConnection, RtcConfig} from 'node-datachannel'
 
-import * as fossilDelta from 'fossil-delta';
+import {EventEmitter} from 'events';
 
-const nanoid = require('nanoid');
-
-import {IceServer, PeerConnection, ProxyServer, RtcConfig} from 'node-datachannel'
-
-import { EventEmitter } from 'events';
-
-import {ConnectorClient, ConnectorClient as Client} from './ConnectorClient';
+import {ConnectorClient as Client} from './ConnectorClient';
 import {setInterval} from "timers";
 import {IConnectorClient} from "./ConnectorClients/IConnectorClient";
 import {SdpSignal, WebRTCConnectorClient} from "./ConnectorClients/WebRTC";
 import {WebSocketConnectorClient} from "./ConnectorClients/WebSocket"
-import {WebRTCConnection} from "gotti/lib/core/WebClient/ConnectorServerConnections";
-import Timeout = NodeJS.Timeout;
+import set = Reflect.set;
+import * as assert from "assert";
+
+const nodeDataChannel = require('node-datachannel');
+
+const nanoid = require('nanoid');
+
+
 //import { debugAndPrintError, debugPatch, debugPatchData } from '../../colyseus/lib/Debug';
 
 const DEFAULT_PATCH_RATE = 1000 / 20; // 20fps (50ms)
@@ -70,6 +70,7 @@ export type ServerURI = {
 
 export type ConnectorOptions = IServerOptions & {
     pingTimeout?: number,
+    forceWebRTCClients?: number,
     disableWebRTCClients?: number,
     maxWebRTCConnections?: number,
     gracefullyShutdown?: boolean,
@@ -148,7 +149,17 @@ export abstract class Connector extends EventEmitter {
     private responder: Responder;
     private serverWebRtcConnection;
 
-    private reservedSeats: {[clientId: string]: any} = {};
+    private reservedSeats: {
+        [clientId: string]: {
+            auth: any,
+            playerIndex: number,
+            joinOptions: any,
+            channelClient?: ChannelClient,
+            seatType: ReservedSeatType,
+            timeout: any,
+        }
+    } = {};
+
 
     private messageRelayRate: number; // 20 fps
     constructor(options: ConnectorOptions) {
@@ -232,17 +243,33 @@ export abstract class Connector extends EventEmitter {
         const url = parseURL(upgradeReq.url);
         const query = parseQueryString(url.query);
         req.gottiId = query.gottiId;
+        const gottiId = query.gottiId;
         client.state = 'open';
-        if(!(client) || !(req.gottiId) || !(this.reservedSeats[req.gottiId]) ) {
+        if(!(client) || !(gottiId) || !(this.reservedSeats[req.gottiId]) ) {
             send(client, Protocol.JOIN_CONNECTOR_ERROR, [Protocol.JOIN_CONNECTOR_ERROR])
         } else {
-            const gottiClient = new WebSocketConnectorClient(client, new ChannelClient(req.gottiId, this.masterChannel));
+            const gottiId = req.gottiId;
+            const { auth, joinOptions, playerIndex, seatType } = this.reservedSeats[gottiId];
+            let wasRejoin = false;
+            let gottiClient : WebSocketConnectorClient;
+            const oldClient = this.clientsById[gottiId];
+            if(seatType === ReservedSeatType.DIRTY_WEB_RTC_DISCONNECT) {
+                gottiClient = new WebSocketConnectorClient(client, oldClient.channelClient);
+                if(!oldClient) throw new Error(`No old client when player disconnected.`);
+                this.transferClientData(oldClient, gottiClient);
+                wasRejoin = true;
+            } else if(oldClient) {
+                throw new Error(`Should not already have a client`)
+            } else {
+                gottiClient = new WebSocketConnectorClient(client, new ChannelClient(req.gottiId, this.masterChannel));
+            }
+            gottiClient.gottiId = gottiId;
             gottiClient.p2p_capable = query.isWebRTCSupported;
-            gottiClient.gottiId = req.gottiId;
-            gottiClient.playerIndex = this.reservedSeats[req.gottiId].playerIndex;
+            gottiClient.playerIndex = playerIndex;
             gottiClient.state = 'open';
             gottiClient.pingCount = 0;
-            this._onJoin(gottiClient, this.reservedSeats[req.gottiId].auth, this.reservedSeats[req.gottiId].joinOptions);
+            console.log('got rejoin as', wasRejoin, auth)
+            this._onJoin(gottiClient, auth, joinOptions, wasRejoin);
         }
 
         // prevent server crashes if a single client had unexpected error
@@ -355,7 +382,7 @@ export abstract class Connector extends EventEmitter {
         let i = this.clients.length;
         while (i--) {
             const client = this.clients[i];
-            client.close(WS_CLOSE_CONSENTED);
+            client.state === 'open' && client.close(WS_CLOSE_CONSENTED);
         }
         try {this.masterChannel && this.masterChannel.disconnect();
         } catch(err){};
@@ -363,7 +390,9 @@ export abstract class Connector extends EventEmitter {
         }catch(err){};
         try{this.responder.close();
         }catch(err){};
-
+        if(this.maxWebRTCConnections !== 0) {
+            nodeDataChannel.cleanup();
+        }
         return new Promise((resolve, reject) => {
             if(closeHttp) {
                 this.httpServer.close(() => {
@@ -447,7 +476,6 @@ export abstract class Connector extends EventEmitter {
         this.awaitingWebRTCConnections[client.gottiId] = webRTCClient;
         this.currentWebRTCConnections++;
         webRTCClient.on('added-signal', (signal) => {
-            console.log('send')
             const stillCollecting = this.clientsById[client.gottiId] === client;
             stillCollecting && send(client, Protocol.SERVER_WEBRTC_CANDIDATE,[Protocol.SERVER_WEBRTC_CANDIDATE, signal])
         });
@@ -455,9 +483,6 @@ export abstract class Connector extends EventEmitter {
             this.handleFinishSuccesfulWebSocketToWebRTCClient(client, webRTCClient);
         });
         return new Promise((resolve, reject) => {
-            webRTCClient.on('disconnected', (reason: string) => {
-                this.handleDirtyWebRTCDisconnect(webRTCClient);
-            });
             webRTCClient.on('failed-to-connect', (reason: string) => {
                 if(fulfilled) return;
                 fulfilled = true;
@@ -642,16 +667,29 @@ export abstract class Connector extends EventEmitter {
         newClient.p2p_enabled = oldClient.p2p_enabled;
     }
 
-    private handleDirtyWebRTCDisconnect(client: WebRTCConnectorClient) {
+    private handleCleanWebRTCDisconnect(client: WebRTCConnectorClient) {
+        this.removeWebRTCClientRef(client);
+        this._onLeave(client)
+    }
+
+    private removeWebRTCClientRef(client) : boolean {
         const idx = this.webRTCConnections.indexOf(client);
-        if(idx < 0) throw new Error(`Expected to find.`);
+        console.log('index', idx);
+        if(idx < 0) return false;
         this.webRTCConnections.splice(idx);
         this.currentWebRTCConnections--;
         if(!this.currentWebRTCConnections) {
-            if(this.webRTCConnections.length) throw new Error(`Length should be 0.`)
             this.stopAckInterval();
+            if(this.webRTCConnections.length) throw new Error(`Length should be 0.`)
         }
-        this._reserveSeat(client.gottiId, client.playerIndex, client.auth, client.joinOptions, 3000);
+        return true;
+    }
+
+    private handleDirtyWebRTCDisconnect(client: WebRTCConnectorClient) {
+        if(!this.removeWebRTCClientRef(client)) throw new Error(`Expected to remove.`)
+        this._reserveSeat(client.gottiId, client.playerIndex, client.auth, client.joinOptions, ReservedSeatType.DIRTY_WEB_RTC_DISCONNECT, 5000, () => {
+            this.handleCleanWebRTCDisconnect(client);
+        });
     }
 
     private handleFinishSuccesfulWebSocketToWebRTCClient(webSocketClient: WebSocketConnectorClient, webRtcClient: WebRTCConnectorClient) : WebRTCConnectorClient {
@@ -666,10 +704,16 @@ export abstract class Connector extends EventEmitter {
         this.clientsById[webSocketClient.gottiId] = webRtcClient;
         this.webRTCConnections.push(webRtcClient);
         this.transferClientData(webSocketClient, webRtcClient);
+        webSocketClient.removeAllListeners();
         webSocketClient.close();
         webRtcClient.on('message', this._onWebClientMessage.bind(this, webRtcClient));
         webRtcClient.removeAllListeners('opened-channel');
         webRtcClient.removeAllListeners('added-candidate');
+
+        webRtcClient.once('closed-channel', (reason: string) => {
+            console.log('closed reason:', reason)
+            this.handleDirtyWebRTCDisconnect(webRtcClient);
+        });
         this.emit('webrtc-connection',  webRtcClient)
         if(!this.ackInterval) {
             this.startAckInterval();
@@ -806,25 +850,36 @@ export abstract class Connector extends EventEmitter {
         send(client, Protocol.REMOVE_CLIENT_AREA_LISTEN, [Protocol.REMOVE_CLIENT_AREA_LISTEN, areaId, options] );
     }
 
-    private _onJoin(client: WebSocketConnectorClient, auth: any, joinOptions: any) {
+    private _onJoin(client: WebSocketConnectorClient, auth: any, joinOptions: any, wasRejoin=false) {
         // clear the timeout and remove the reserved seat since player joined
         clearTimeout(this.reservedSeats[client.gottiId].timeout);
+        console.log('removing the client id', client.gottiId, 'from reserved seats')
         delete this.reservedSeats[client.gottiId];
         // add a channelClient to client
         // register channel/area message handlers
-        this.registerClientAreaMessageHandling(client);
-        this.clients.push( client );
+        if(!wasRejoin) {
+            this.registerClientAreaMessageHandling(client);
+            this.clientsById[client.gottiId] = client;
+            this.clients.push( client );
+            client.auth = auth;
+            client.joinOptions = joinOptions;
+            if(this.onJoin) {
+                client.joinedOptions = this.onJoin(client, this.changeAreaWrite.bind(this, client))
+            }
+            client.auth = auth;
+            if(this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
+                this.relayChannel.send([Protocol.JOIN_CONNECTOR, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid])
+            }
+        } else {
+            const oldClient = this.clientsById[client.gottiId];
+            const idx = this.clients.indexOf(oldClient);
+            assert(idx > -1);
+            this.clients[idx] = client;
+        }
+
         this.clientsById[client.gottiId] = client;
-        client.auth = auth;
-        client.joinOptions = joinOptions;
-        if(this.onJoin) {
-            client.joinedOptions = this.onJoin(client, this.changeAreaWrite.bind(this, client))
-        }
-        client.auth = auth;
+
         send(client, Protocol.JOIN_CONNECTOR,[ Protocol.JOIN_CONNECTOR, client.joinedOptions ]);
-        if(this.relayChannel) { // notify the relay server of client with connector for failed p2p system messages to go through
-            this.relayChannel.send([Protocol.JOIN_CONNECTOR, client.p2p_capable, client.playerIndex, client.gottiId, this.relayChannel.frontUid])
-        }
         client.on('message', (message) => {
             let decoded = decode(message);
             if (!decoded) {
@@ -840,7 +895,6 @@ export abstract class Connector extends EventEmitter {
     }
 
     private async _onLeave(client: IConnectorClient, code?: number): Promise<any> {
-        console.error('the client was', 'code', code)
         if(client['closingForWebRTC']) return;
         // call abstract 'onLeave' method only if the client has been successfully accepted.
         if(this.relayChannel) {
@@ -867,13 +921,15 @@ export abstract class Connector extends EventEmitter {
      * @param joinOptions - additional data sent from the gate
      * @private
      */
-    private _reserveSeat(clientId, playerIndex, auth, joinOptions, timeout=10000) {
+    private _reserveSeat(clientId, playerIndex, auth, joinOptions, type: ReservedSeatType, timeout=10000, onTimeout?: () => void) {
         this.reservedSeats[clientId] = {
             auth,
             playerIndex,
             joinOptions,
+            seatType: type,
             timeout: setTimeout(() => {
                 delete this.reservedSeats[clientId];
+                onTimeout && onTimeout();
             }, timeout) // reserve seat for 10 seconds
         }
     }
@@ -891,7 +947,7 @@ export abstract class Connector extends EventEmitter {
 
         if(this.requestJoin(auth, joinOptions)) {
             const gottiId = generateId();
-            this._reserveSeat(gottiId, playerIndex, auth, joinOptions);
+            this._reserveSeat(gottiId, playerIndex, auth, joinOptions, ReservedSeatType.GATE);
             // todo send host n port
             return { gottiId } ;
         } else {

@@ -5,7 +5,7 @@ import {Client as ChannelClient} from "gotti-channels/dist";
 export interface IConnectorClient {
     state: 'open' | 'closed';
     removeAllListeners: (message: string) => void;
-    close: (reason?: number) => void;
+    close: (reason?: number | string) => void;
     on: (message: string, cb:(data:any) => void) => void;
     once: (message: string, cb:(data:any) => void) => void;
     send: (message: string | Buffer | Array<any>, opts?: { reliable?: boolean, ordered?: boolean, retryRate?: number, firstRetryRate?: number }) => void;

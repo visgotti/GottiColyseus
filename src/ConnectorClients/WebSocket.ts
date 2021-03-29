@@ -33,7 +33,7 @@ export class WebSocketConnectorClient implements IConnectorClient {
     close() {}
     on(message: string, cb: (data: any) => void): void {}
     once(message: string, cb: (data: any) => void): void {}
-    removeAllListeners(message: string): void {}
+    removeAllListeners(message?: string): void {}
     send(message: string) : void {};
     sendReliable(message: Array<any> | Buffer, ordered=false, opts?: { retryRate?: number, firstRetryRate?: number } ) : void {
         this.send(msgpack.encode(message));

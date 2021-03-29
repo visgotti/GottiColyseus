@@ -1,3 +1,5 @@
+export const MAX_ACK_SEQ = 65535;
+
 import {IConnectorClient} from "./ConnectorClients/IConnectorClient";
 
 const msgpack = require('notepack.io');
@@ -6,6 +8,11 @@ import * as WebSocket from 'ws';
 //import { debugAndPrintError } from './Debug';
 import { ConnectorClient } from './ConnectorClient';
 export const WS_CLOSE_CONSENTED = 4000;
+
+export enum ReservedSeatType {
+    GATE,
+    DIRTY_WEB_RTC_DISCONNECT
+}
 
 
 export const enum Protocol {
