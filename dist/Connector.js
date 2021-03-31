@@ -319,10 +319,10 @@ class Connector extends events_1.EventEmitter {
                 }
             }
             else if (message[0] === 34 /* AREA_TO_AREA_SYSTEM_MESSAGE */) {
-                // [protocol, type, data, to, from, areaIds]
-                const toAreaIds = message[5];
-                // reassign last value in array to the from area id
-                message[5] = areaChannel.channelId;
+                // [protocol, type, data, to, areaIds]
+                const toAreaIds = message[4];
+                // reassign last value in array to be the from area id
+                message[4] = areaChannel.channelId;
                 areaChannel.broadcast(message, toAreaIds);
             }
             else if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
@@ -344,9 +344,7 @@ class Connector extends events_1.EventEmitter {
             Protocol_1.send(client, 24 /* WRITE_AREA_ERROR */);
             return false;
         }
-        console.log('running get initialWriteArea');
         const write = this.getInitialWriteArea(client, this.areaData, clientOptions);
-        console.log('write area id was', write.areaId);
         if (write) {
             // will dispatch area messages to systems
             await this.changeAreaWrite(client, write.areaId, write.options);

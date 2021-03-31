@@ -41,7 +41,6 @@ class RelayServer {
                 this.handlePeerFailedConnection(message[1], message[2]);
             }
             else if (protocol === 114 /* PEER_CONNECTION_REQUEST */) {
-                console.log('RELAY SERVER IS HANDLING PEER CONNECTION handlePeerConnectionRequest!!!!');
                 // [protocol, toPlayerIndex, { sdp, candidate  }, fromSystemName, requestOptions, fromPlayerIndex, frontUid]
                 this.handlePeerConnectionRequest(message[1], message[2], message[3], message[4], message[5], message[6]);
             }
