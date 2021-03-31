@@ -469,10 +469,10 @@ export abstract class Connector extends EventEmitter {
                     send(client, message, false);
                 }
             } else if (message[0] === Protocol.AREA_TO_AREA_SYSTEM_MESSAGE) {
-                // [protocol, type, data, to, from, areaIds]
-                const toAreaIds = message[5];
-                // reassign last value in array to the from area id
-                message[5] = areaChannel.channelId;
+                // [protocol, type, data, to, areaIds]
+                const toAreaIds = message[4];
+                // reassign last value in array to be the from area id
+                message[4] = areaChannel.channelId;
                 areaChannel.broadcast(message, toAreaIds)
             } else if(message[0] === Protocol.AREA_TO_MASTER_MESSAGE) {
                 this.masterServerChannel.send([Protocol.AREA_TO_MASTER_MESSAGE, areaChannel.channelId, message[1]])
