@@ -17,7 +17,7 @@
     "gotti-reqres": "^0.1.1",
     "helmet": "^3.21.2",
     "http-proxy-middleware": "^0.20.0",
-    "nanoid": "^2.0.1",
+    "nanoid": "^3.1.31",
     "notepack.io": "^2.2.0",
     "querystring": "^0.2.0",
     "url-parse": "^1.4.4",
