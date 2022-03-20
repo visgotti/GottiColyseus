@@ -37,7 +37,6 @@ export abstract class MasterServer {
             } else if (message[0] === Protocol.CONNECTOR_TO_MASTER_MESSAGE) {
                 this.onConnectorMessage(message[1], message[2]);
             } else if (message[0] === Protocol.AREA_TO_MASTER_REQUEST) {
-                this.onAreaRequest()
             }
         });
     }
@@ -51,7 +50,8 @@ export abstract class MasterServer {
     }
 
     public dispatchToArea(areaId: string, message: any) {
-        this.channel.send()
+        console.error("Not implemented yet.")
+        //this.channel.send()
     }
 
     private initializeGracefulShutdown() {
