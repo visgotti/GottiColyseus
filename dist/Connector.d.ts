@@ -111,6 +111,7 @@ export declare abstract class Connector extends EventEmitter {
     private registerChannelMessages;
     private registerMasterServerMessages;
     private registerRelayMessages;
+    dispatchToMaster(message: any): void;
     private registerAreaMessages;
     private _getInitialWriteArea;
     private _onWebClientMessage;

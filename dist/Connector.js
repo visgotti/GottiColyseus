@@ -304,6 +304,10 @@ class Connector extends events_1.EventEmitter {
             }
         });
     }
+    dispatchToMaster(message) {
+        this.masterChannel.channelId;
+        this.masterServerChannel.send([38 /* CONNECTOR_TO_MASTER_MESSAGE */, this.masterChannel.channelId, message]);
+    }
     registerAreaMessages(areaChannel) {
         areaChannel.onMessage((message) => {
             if (message[0] === 28 /* SYSTEM_MESSAGE */ || message[0] === 29 /* IMMEDIATE_SYSTEM_MESSAGE */) {

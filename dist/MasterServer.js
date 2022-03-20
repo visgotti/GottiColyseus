@@ -17,6 +17,9 @@ class MasterServer {
             if (message[0] === 35 /* AREA_TO_MASTER_MESSAGE */) {
                 this.onAreaMessage(message[1], message[2]);
             }
+            else if (message[0] === 38 /* CONNECTOR_TO_MASTER_MESSAGE */) {
+                this.onConnectorMessage(message[1], message[2]);
+            }
         });
     }
     /**

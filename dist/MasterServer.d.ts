@@ -22,6 +22,6 @@ export declare abstract class MasterServer {
     dispatchToAreas(message: any): void;
     private initializeGracefulShutdown;
     private addConnector;
-    abstract onConnectorMessage(client: Client, message: any): void;
+    abstract onConnectorMessage(connectorId: string, message: any): void;
     abstract onAreaMessage(areaId: Client, message: any): void;
 }

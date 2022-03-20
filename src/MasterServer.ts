@@ -34,6 +34,10 @@ export abstract class MasterServer {
         this.channel.onMessage((message) => {
             if(message[0] === Protocol.AREA_TO_MASTER_MESSAGE) {
                 this.onAreaMessage(message[1], message[2]);
+            } else if (message[0] === Protocol.CONNECTOR_TO_MASTER_MESSAGE) {
+                this.onConnectorMessage(message[1], message[2]);
+            } else if (message[0] === Protocol.AREA_TO_MASTER_REQUEST) {
+                this.onAreaRequest()
             }
         });
     }
@@ -44,6 +48,10 @@ export abstract class MasterServer {
      */
     public dispatchToAreas(message: any){
         this.channel.broadcast([Protocol.MASTER_TO_AREA_BROADCAST, message])
+    }
+
+    public dispatchToArea(areaId: string, message: any) {
+        this.channel.send()
     }
 
     private initializeGracefulShutdown() {
@@ -79,6 +87,6 @@ export abstract class MasterServer {
 
         return this.connectorsByServerIndex[serverIndex];
     }
-    public abstract onConnectorMessage(client: Client, message: any): void;
+    public abstract onConnectorMessage(connectorId: string, message: any): void;
     public abstract onAreaMessage(areaId: Client, message: any): void;
 }

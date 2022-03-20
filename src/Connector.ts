@@ -455,6 +455,11 @@ export abstract class Connector extends EventEmitter {
         });
     }
 
+    public dispatchToMaster(message: any) {
+        this.masterChannel.channelId
+        this.masterServerChannel.send([Protocol.CONNECTOR_TO_MASTER_MESSAGE, this.masterChannel.channelId, message]);
+    }
+
     private registerAreaMessages(areaChannel: FrontChannel) {
         areaChannel.onMessage((message) => {
             if(message[0] === Protocol.SYSTEM_MESSAGE || message[0] === Protocol.IMMEDIATE_SYSTEM_MESSAGE) {
@@ -532,7 +537,6 @@ export abstract class Connector extends EventEmitter {
             client.removeAllListeners('message');
             // prevent "onLeave" from being called twice in case the connection is forcibly closed
             client.removeAllListeners('close');
-
             // only effectively close connection when "onLeave" is fulfilled
             this._onLeave(client, WS_CLOSE_CONSENTED).then(() => client.close());
         } else if(protocol === Protocol.CLIENT_WEB_RTC_ENABLED) {
